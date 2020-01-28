@@ -18,19 +18,20 @@ non-obvious. If you wish to deal with those cases see the paragraph after the
 example.
 
 ### Example
-    import auto_diff
-    import numpy as np
+```python
+import auto_diff
+import numpy as np
 
-    # Define a function f
-    # f can have other constant arguments, if they are constant wrt x
-    # Define the input vector, x
+# Define a function f
+# f can have other constant arguments, if they are constant wrt x
+# Define the input vector, x
 
-    with auto_diff.AutoDiff(x) as x:
-        f_eval = f(x, u)
-        y, Jf = auto_diff.get_value_and_jacobian(f_eval)
+with auto_diff.AutoDiff(x) as x:
+    f_eval = f(x, u)
+    y, Jf = auto_diff.get_value_and_jacobian(f_eval)
 
-    # y is the value of f(x, u) and Jf is the Jacobian of f with respect to x.
-
+# y is the value of f(x, u) and Jf is the Jacobian of f with respect to x.
+```
 
 We can also differentiate functions from arbitrarily shaped numpy arrays to
 arbitrarily shaped outputs. Let `y = f(x)`, where `x` is a numpy array of shape
@@ -40,13 +41,14 @@ We can then access a numpy array of shape `(*y.shape, *x.shape)`, by accessing
 `y.der`. This represents the gradients of each component of `y` with respect to
 `x`. To find the gradient of the norm of a vector x, for example one can do
 
-    import auto_diff
-    import numpy as np
-    x = np.array([[np.pi], [3.0], [17.0]])
+```python
+import auto_diff
+import numpy as np
+x = np.array([[np.pi], [3.0], [17.0]])
 
-
-    with auto_diff.AutoDiff(x) as x:
-        print(np.linalg.norm(x).der)
+with auto_diff.AutoDiff(x) as x:
+    print(np.linalg.norm(x).der)
+```
 
 ## Restrictions
 
