@@ -65,6 +65,6 @@ A version of NumPy >= 1.17 may be required. Bugs on older versions have always
 raised errors, so there should be nothing to worry about.
 
 Author: Parth Nobel (Github: /PTNobel, parthnobel@berkeley.edu)
-Version: 0.2
+Version: 0.3
 
 
