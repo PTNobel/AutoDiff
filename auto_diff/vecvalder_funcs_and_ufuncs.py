@@ -43,7 +43,7 @@ def _chain_rule(f_x, dx, out=None):
     if out is None:
         out = np.ndarray(dx.shape)  # Uninitialized memory is fine because
     # we're about to overwrite each element. If we do compression of the for
-    # loop in the future be sure to swtich to np.zeros.
+    # loop in the future be sure to switch to np.zeros.
     for index, y in np.ndenumerate(f_x):
         out[index] = y * dx[index]
     return out
@@ -284,25 +284,33 @@ def true_divide(x1, x2, /, out):
         raise RuntimeError("This should not be occuring.")
 
 
-# Tested
 @register(np.float_power)
 @_add_out_support
-def float_power(x1, x2):
+def float_power(x1, x2, /, out):
     if isinstance(x1, cls) and isinstance(x2, cls):
-        return cls(x1.val ** x2.val, x1.val**(x2.val - 1) * (
-            x2.val * x1.der + x1.val * np.log(x1.val) * x2.der))
+        return cls(np.float_power(x1.val, x2.val, out=out.val),
+                np.multiply(x1.val**(x2.val - 1), (x2.val * x1.der + x1.val * np.log(x1.val) * x2.der), out=out.der))
     elif isinstance(x1, cls):
-        return cls(x1.val ** x2, x1.val**(x2 - 1) * x2 * x1.der)
+        return cls(np.float_power(x1.val, x2, out=out.val), np.multiply(x1.val**(x2 - 1) * x2, x1.der, out=out.der))
     elif isinstance(x2, cls):
-        return cls(x1.val ** x2.val, x1**(x2.val) * np.log(x1.val) * x2.der)
+        return cls(np.float_power(x1, x2.val, out=out.val), np.multiply(x1**(x2.val) * np.log(x1.val), x2.der, out=out.der))
     else:
         raise RuntimeError("This should not be occuring.")
 
 
 @register(np.power)
 @_add_out_support
-def power(x1, x2):
-    return float_power(x1, x2)
+def power(x1, x2, /, out):
+    if isinstance(x1, cls) and isinstance(x2, cls):
+        return cls(np.power(x1.val, x2.val, out=out.val),
+                np.multiply(x1.val**(x2.val - 1), (x2.val * x1.der + x1.val * np.log(x1.val) * x2.der), out=out.der))
+    elif isinstance(x1, cls):
+        return cls(np.power(x1.val, x2, out=out.val), np.multiply(x1.val**(x2 - 1) * x2, x1.der, out=out.der))
+    elif isinstance(x2, cls):
+        return cls(np.power(x1, x2.val, out=out.val), np.multiply(x1**(x2.val) * np.log(x1.val), x2.der, out=out.der))
+    else:
+        raise RuntimeError("This should not be occuring.")
+
 
 
 # Partially Tested

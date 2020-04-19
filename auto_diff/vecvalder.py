@@ -4,6 +4,11 @@ from . import true_np
 
 _HANDLED_FUNCS_AND_UFUNCS = {}
 
+def _defer_to_val(f):
+    def fn(self, *args, **kwargs):
+        return getattr(self.val, f)(*args, **kwargs)
+    fn.__name__ = f
+    return fn
 
 class VecValDer(np.lib.mixins.NDArrayOperatorsMixin):
     __slots__ = 'val', 'der'
@@ -24,6 +29,34 @@ class VecValDer(np.lib.mixins.NDArrayOperatorsMixin):
         if len(axes) == 0:
             axes = None
         return np.transpose(self, axes)
+
+    all = _defer_to_val('all')
+    any = _defer_to_val('any')
+    argmax = _defer_to_val('argmax')
+    argmin = _defer_to_val('argmin')
+    argpartition = _defer_to_val('argpartition')
+    argsort = _defer_to_val('argsort')
+    nonzero = _defer_to_val('nonzero')
+    
+    def copy(self):
+        return VecValDer(self.val.copy(), self.der.copy())
+
+    def fill(self, value):
+        if isinstance(value, VecValDer):
+            self.val.fill(value.val)
+            self.der[:] = value.der
+        else:
+            self.val.fill(value)
+            self.der.fill(0.0)
+
+    def reshape(self, shape):
+        der_dim_shape = self.der.shape[len(self.val.shape):]
+        new_der_shape = shape + der_dim_shape
+        self.val.reshape(shape)
+        self.der.reshape(new_der_shape)
+
+    def trace(self, *args, **kwargs):
+        return np.trace(*args, **kwargs)
 
     def __array_ufunc__(self, ufunc, method, *args, **kwargs):
         if method == '__call__' and ufunc in _HANDLED_FUNCS_AND_UFUNCS:
