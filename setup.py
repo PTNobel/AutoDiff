@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="auto_diff",
-    version="0.3.0",
+    version="0.3.1",
     author="Parth Nobel",
     author_email="parthnobel@berkeley.edu",
     description="An automatic differentiation library for Python+NumPy.",
