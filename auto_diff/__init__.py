@@ -20,9 +20,11 @@ Example:
     import auto_diff
     import numpy as np
 
-    # Define a function f
-    # f can have other constant arguments, if they are constant wrt x
-    # Define the input vector, x
+    # Define a function f(x), where you want f() differentiated wrt x
+    # x and f() should be numpy arrays.
+    # f() can have other arguments, eg, f(x, u)
+    # Define the input vector, x, to be a numpy array.
+    # Then, evaluate f() and its Jacobian, do:
 
     with auto_diff.AutoDiff(x) as x:
         f_eval = f(x, u)
