@@ -16,20 +16,49 @@ vector. In most other cases, how to convert to a Jacobian Matrix is
 non-obvious. If you wish to deal with those cases see the paragraph after the
 example.
 
-Example:
+Examples:
     import auto_diff
     import numpy as np
 
-    # Define a function f
-    # f can have other constant arguments, if they are constant wrt x
-    # Define the input vector, x
-
-    with auto_diff.AutoDiff(x) as x:
-        f_eval = f(x, u)
-        y, Jf = auto_diff.get_value_and_jacobian(f_eval)
-
+    # Define a function f(x), where you want f() differentiated wrt x
+    # x and f() should be numpy arrays.
+    # f() can have other arguments, eg, f(x, u)
+    # Define the input vector, x, to be a numpy array.
+    # Then, evaluate f() and its Jacobian, do:
+    #   with auto_diff.AutoDiff(x) as x:
+    #       f_eval = f(x, u)
+    #       y, Jf = auto_diff.get_value_and_jacobian(f_eval)
     # y is the value of f(x, u) and Jf is the Jacobian of f with respect to x.
 
+    # scalar function example
+    def f(x):
+        return(x*x);
+    x = 3;
+    with auto_diff.AutoDiff(x) as x:
+        f_eval = f(x);
+        y, Jf = auto_diff.get_value_and_jacobian(f_eval);
+
+    # vector function example 1
+    def f(x):
+        retval = np.zeros((3,1));
+        retval[0] = 1*x[0] + 2*x[1] + 3*x[2];
+        retval[1] = 4*x[0] + 5*x[1] + 6*x[2];
+        retval[2] = 7*x[0] + 8*x[1] + 9*x[2];
+        return(retval);
+    x = np.array([[1],[2],[3]]);
+    with auto_diff.AutoDiff(x) as x:
+        f_eval = f(x);
+        y, Jf = auto_diff.get_value_and_jacobian(f_eval);
+
+    # vector function example 2: f(x) = A x
+    A = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
+    def f(x):
+        # return(A*x);
+        return(A@x);
+    x = np.array([[1],[2],[3]]);
+    with auto_diff.AutoDiff(x) as x:
+        f_eval = f(x);
+        y, Jf = auto_diff.get_value_and_jacobian(f_eval);
 
 We can also differentiate functions from arbitrarily shaped numpy arrays to
 arbitrarily shaped outputs. Let y = f(x), where x is a numpy array of shape
@@ -42,7 +71,6 @@ To find the gradient of the norm of a vector x, for example one can do
     import auto_diff
     import numpy as np
     x = np.array([[np.pi], [3.0], [17.0]])
-
 
     with auto_diff.AutoDiff(x) as x:
         print(np.linalg.norm(x).der)
