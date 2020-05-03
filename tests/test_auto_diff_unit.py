@@ -9,10 +9,13 @@ class AutoDiffUnitTesting(unittest.TestCase):
 
 
 class TestSingleVariableAutoDiff(AutoDiffUnitTesting):
-    def _test_helper(self, f, x, df_dx):
+    def _test_helper(self, f, x, df_dx, debug=False):
+        if debug:
+            breakpoint()
+
         input_x = x
-        f_x = f(x)
-        with auto_diff.AutoDiff(x) as x:
+        f_x = f(input_x)
+        with auto_diff.AutoDiff(input_x) as x:
             y, Jf = auto_diff.get_value_and_jacobian(f(x))
 
         self._assertAllClose(y, f_x)
@@ -31,9 +34,11 @@ class TestSingleVariableAutoDiff(AutoDiffUnitTesting):
         self._assertAllClose(y, f_x)
         self._assertAllClose(Jf, df_dx)
 
-    def _test_out(self, f, x, df_dx):
+    def _test_out(self, f, x, df_dx, debug=False):
+        if debug:
+            breakpoint()
         input_x = x
-        f_x = f(x)
+        f_x = f(input_x)
 
         with auto_diff.AutoDiff(input_x) as x:
             out_dest = np.ndarray(f_x.shape)
@@ -77,7 +82,7 @@ class TestSingleVariableAutoDiff(AutoDiffUnitTesting):
         with self.assertWarns(UserWarning, msg='abs of a near-zero number, derivative is ill-defined'):
             self._test_helper(f, x, df_dx)
             self._test_out(f, x, df_dx)
-        
+
     def test_sqrt(self):
         f = np.sqrt
         x = np.array([[2.], [4.], [9.0]])
@@ -252,7 +257,10 @@ class TestSingleVariableAutoDiff(AutoDiffUnitTesting):
 
 
 class TestMultipleVariableAutoDiff(AutoDiffUnitTesting):
-    def _test_helper(self, f, x, u, df_dx, df_du):
+    def _test_helper(self, f, x, u, df_dx, df_du, debug=False):
+        if debug:
+            breakpoint()
+
         f_xu = f(x, u)
 
         with auto_diff.AutoDiff(x, u) as (x, u):
@@ -275,6 +283,16 @@ class TestMultipleVariableAutoDiff(AutoDiffUnitTesting):
         u = np.array([[.2, 8.3, .5]]).T
 
         self._test_helper(lambda x, u: A @ x + B @ u, x, u, A, B)
+
+    def test_add_and_mulitply(self):
+        def f(x, u):
+            A = np.array([[2., -1], [-1, 2]])
+            B = np.array([[1.] , [0]])
+            return A @ x + B * u
+
+        x = np.array([[5.], [3.]])
+        u = np.array([[3.]])
+        self._test_helper(f, x, u, np.array([[2, -1], [-1, 2.]]), np.array([[1], [0.]]))
 
 
 if __name__ == '__main__':
