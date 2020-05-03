@@ -59,8 +59,7 @@ class TestSingleVariableAutoDiff(AutoDiffUnitTesting):
                             [0.0, 1 + 1./4., 0.0],
                             [0.0, 0.0, 1 + 1./6.]])
         self._test_helper(f, x, df_dx)
-        
-        
+
     def test_multiply_with_out(self):
         def f(x):
             y = np.sqrt(x)
@@ -101,15 +100,7 @@ class TestSingleVariableAutoDiff(AutoDiffUnitTesting):
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
         
-    def _test_transpose(self):
-        # Testing transpose requires accessing internals as it enforces the output
-        # being a column vector
-        print("TODO: Write a test of transpose")
-        # f = lambda x: x.T
-        # x = np.array([[np.pi], [-np.pi/2], [np.pi/4]])
-        # df_dx = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0, 0, 1.0]])
-        # test(f, x, df_dx, 'transpose')
-        
+       
     def test_cos(self):
         f = np.cos
         x = np.array([[np.pi], [-np.pi/2], [np.pi/4]])
@@ -284,6 +275,36 @@ class TestMultipleVariableAutoDiff(AutoDiffUnitTesting):
         self._assertAllClose(y, f_xu)
         self._assertAllClose(J_fu, df_du)
 
+        # Some bugs only appeared with rectangular Jacobians.
+        A_x = np.random.rand(input_x.shape[0], 3 * input_x.shape[0])
+        b_x = np.random.rand(input_x.shape[0], 1)
+        affine_x = np.linalg.lstsq(A_x, input_x - b_x, rcond=None)[0]
+
+        A_u = np.random.rand(input_u.shape[0], 3 * input_x.shape[0])
+        b_u = np.random.rand(input_u.shape[0], 1)
+        affine_u = np.linalg.lstsq(A_u, input_u - b_u, rcond=None)[0]
+
+        df_dx = df_dx @ A_x
+        df_du = df_du @ A_u
+
+        with auto_diff.AutoDiff(affine_x, affine_u) as (x, u):
+            y, (J_fx, J_fu) = auto_diff.get_value_and_jacobians(f(A_x @ x + b_x, A_u @ u + b_u))
+    
+        self._assertAllClose(y, f_xu)
+        self._assertAllClose(J_fx, df_dx)
+        self._assertAllClose(J_fu, df_du)
+
+        with auto_diff.AutoDiff(affine_x) as x:
+            y, J_fx = auto_diff.get_value_and_jacobian(f(A_x @ x + b_x, A_u @ affine_u + b_u))
+    
+        self._assertAllClose(y, f_xu)
+        self._assertAllClose(J_fx, df_dx)
+
+        with auto_diff.AutoDiff(affine_u) as u:
+            y, J_fu = auto_diff.get_value_and_jacobian(f(A_x @ affine_x + b_x, A_u @ u + b_u))
+    
+        self._assertAllClose(y, f_xu)
+        self._assertAllClose(J_fu, df_du)
 
     def test_linear(self):
         A = np.array([[5, 6., 3., 1.],
@@ -408,7 +429,28 @@ class TestMultipleVariableAutoDiff(AutoDiffUnitTesting):
 
         self._test_helper(f, x, u, df_dx, df_du)
 
+class TestArbitraryShapeAutoDiff(AutoDiffUnitTesting):
+    def _test_helper(self, f, x, df_dx, debug=False):
+        if debug:
+            breakpoint()
 
+        input_x = x
+        f_x = f(input_x)
+        with auto_diff.AutoDiff(input_x) as x:
+            ad_f_x = f(x)
+            y, Jf = ad_f_x.val, ad_f_x.der
+
+        self._assertAllClose(y, f_x)
+        self._assertAllClose(Jf, df_dx)
+
+    def _test_transpose(self):
+        # Testing transpose requires accessing internals as it enforces the output
+        # being a column vector
+        print("TODO: Write a test of transpose")
+        # f = lambda x: x.T
+        # x = np.array([[np.pi], [-np.pi/2], [np.pi/4]])
+        # df_dx = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0, 0, 1.0]])
+        # test(f, x, df_dx, 'transpose')
 
 
 if __name__ == '__main__':
