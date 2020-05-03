@@ -161,6 +161,51 @@ def arctan(x, /, out):
                _chain_rule(1.0 / (1 + x.val**2), x.der, out=out.der))
 
 
+# TODO: Write Test
+@register(np.tanh)
+@_add_out_support
+def tanh(x, /, out):
+    return cls(np.tanh(x.val, out=out.val),
+               _chain_rule(1.0/(np.cosh(x.val)**2), x.der, out=out.der))
+
+# TODO: Write Test
+@register(np.sinh)
+@_add_out_support
+def sinh(x, /, out):
+    return cls(np.sinh(x.val, out=out.val),
+               _chain_rule(np.cosh(x.val), x.der, out=out.der))
+
+
+# TODO: Write Test
+@register(np.cosh)
+@_add_out_support
+def cosh(x, /, out):
+    return cls(np.cosh(x.val, out=out.val),
+               _chain_rule(np.sinh(x.val), x.der, out=out.der))
+
+# TODO: Write Test
+@register(np.arccosh)
+@_add_out_support
+def arccosh(x, /, out):
+    return cls(np.arccosh(x.val, out=out.val),
+               _chain_rule(1 / np.sqrt(x**2 -1), x.der, out=out.der))
+
+# TODO: Write Test
+@register(np.arcsinh)
+@_add_out_support
+def arcsinh(x, /, out):
+    return cls(np.arcsinh(x.val, out=out.val),
+               _chain_rule(1 / np.sqrt(x**2 + 1), x.der, out=out.der))
+
+
+# TODO: Write Test
+@register(np.arctanh)
+@_add_out_support
+def arctanh(x, /, out):
+    return cls(np.arcsinh(x.val, out=out.val),
+               _chain_rule(1 / (1 - x**2), x.der, out=out.der))
+
+
 # Tested
 @register(np.exp)
 @_add_out_support
