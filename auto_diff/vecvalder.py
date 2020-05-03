@@ -52,8 +52,7 @@ class VecValDer(np.lib.mixins.NDArrayOperatorsMixin):
     def reshape(self, shape):
         der_dim_shape = self.der.shape[len(self.val.shape):]
         new_der_shape = shape + der_dim_shape
-        self.val.reshape(shape)
-        self.der.reshape(new_der_shape)
+        return VecValDer(self.val.reshape(shape), self.der.reshape(new_der_shape))
 
     def trace(self, *args, **kwargs):
         return np.trace(*args, **kwargs)
