@@ -5,7 +5,7 @@ import numpy as np
 
 class AutoDiffUnitTesting(unittest.TestCase):
     def _assertAllClose(self, actual, desired, rtol=1e-07, atol=1e-12, equal_nan=True):
-        self.assertTrue(np.allclose(actual, desired, rtol, atol, equal_nan))
+        np.testing.assert_allclose(actual, desired, rtol, atol, equal_nan)
 
 
 class TestSingleVariableAutoDiff(AutoDiffUnitTesting):
@@ -263,12 +263,27 @@ class TestMultipleVariableAutoDiff(AutoDiffUnitTesting):
 
         f_xu = f(x, u)
 
+        input_x = x
+        input_u = u
+
         with auto_diff.AutoDiff(x, u) as (x, u):
             y, (J_fx, J_fu) = auto_diff.get_value_and_jacobians(f(x, u))
-
         self._assertAllClose(y, f_xu)
         self._assertAllClose(J_fx, df_dx)
         self._assertAllClose(J_fu, df_du)
+
+        u = input_u
+        with auto_diff.AutoDiff(input_x) as x:
+            y, J_fx = auto_diff.get_value_and_jacobian(f(x, u))
+        self._assertAllClose(y, f_xu)
+        self._assertAllClose(J_fx, df_dx)
+
+        x = input_x
+        with auto_diff.AutoDiff(input_u) as u:
+            y, J_fu = auto_diff.get_value_and_jacobian(f(x, u))
+        self._assertAllClose(y, f_xu)
+        self._assertAllClose(J_fu, df_du)
+
 
     def test_linear(self):
         A = np.array([[5, 6., 3., 1.],
@@ -293,6 +308,107 @@ class TestMultipleVariableAutoDiff(AutoDiffUnitTesting):
         x = np.array([[5.], [3.]])
         u = np.array([[3.]])
         self._test_helper(f, x, u, np.array([[2, -1], [-1, 2.]]), np.array([[1], [0.]]))
+
+    def test_addition_broadcasting_and_reshape(self):
+        def f(x, u):
+            y = x.T + u
+            return y.reshape((6, 1))
+
+        x = np.array([[5.], [2.]])
+        u = np.array([[3.], [7.], [11.]])
+        df_dx = np.array([[1., 0.],
+                          [0., 1.],
+                          [1., 0.],
+                          [0., 1.],
+                          [1., 0.],
+                          [0., 1.]])
+        
+        df_du = np.array([[1., 0., 0.],
+                          [1., 0., 0.],
+                          [0., 1., 0.],
+                          [0., 1., 0.],
+                          [0., 0., 1.],
+                          [0., 0., 1.]])
+        self._test_helper(f, x, u, df_dx, df_du)
+
+    def test_subtraction_broadcasting_and_reshape(self):
+        def f(x, u):
+            y = np.subtract(x.T, u)
+            return y.reshape((6, 1))
+
+        x = np.array([[5.], [2.]])
+        u = np.array([[3.], [7.], [11.]])
+        df_dx = np.array([[1., 0.],
+                          [0., 1.],
+                          [1., 0.],
+                          [0., 1.],
+                          [1., 0.],
+                          [0., 1.]])
+        df_du = np.array([[-1., 0., 0.],
+                          [-1., 0., 0.],
+                          [0., -1., 0.],
+                          [0., -1., 0.],
+                          [0., 0., -1.],
+                          [0., 0., -1.]])
+
+        self._test_helper(f, x, u, df_dx, df_du)
+
+    def test_division_broadcasting_and_reshape(self):
+        def f(x, u):
+            y = np.divide(x.T, u)
+            return y.reshape((4, 1))
+
+        x = np.array([[5.], [2.]])
+        u = np.array([[3.], [11.]])
+        df_dx = np.array([[1./3, 0.],
+                          [0., 1./3],
+                          [1./11, 0.],
+                          [0., 1./11]])
+        df_du = np.array([[-5/9., 0.],
+                          [-2/9., 0.],
+                          [0., -5/121.],
+                          [0., -2/121.]])
+
+        self._test_helper(f, x, u, df_dx, df_du)
+
+
+    def test_float_power_broadcasting_and_reshape(self):
+        def f(x, u):
+            y = np.float_power(x.T, u)
+            return y.reshape((4, 1))
+
+        x = np.array([[5.], [2.]])
+        u = np.array([[3.], [4.]])
+        df_dx = np.array([[3 * 5.**2, 0.],
+                          [0., 3 * 2.**2],
+                          [4 * 5.**3, 0.],
+                          [0., 4 * 2.**3]])
+        df_du = np.array([[np.log(5) * 5**3, 0.],
+                          [np.log(2) * 2**3, 0.],
+                          [0., np.log(5) * 5**4],
+                          [0., np.log(2) * 2**4]])
+
+        self._test_helper(f, x, u, df_dx, df_du)
+
+    def test_power_broadcasting_and_reshape(self):
+        def f(x, u):
+            y = np.power(x.T, u)
+            return y.reshape((4, 1))
+
+        x = np.array([[5.], [2.]])
+        u = np.array([[3.], [4.]])
+        df_dx = np.array([[3 * 5.**2, 0.],
+                          [0., 3 * 2.**2],
+                          [4 * 5.**3, 0.],
+                          [0., 4 * 2.**3]])
+        df_du = np.array([[np.log(5) * 5**3, 0.],
+                          [np.log(2) * 2**3, 0.],
+                          [0., np.log(5) * 5**4],
+                          [0., np.log(2) * 2**4]])
+
+        self._test_helper(f, x, u, df_dx, df_du)
+
+
 
 
 if __name__ == '__main__':

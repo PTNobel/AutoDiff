@@ -216,41 +216,65 @@ def positive(x, /, out):
 
 
 # Tested
-# TODO: Reimplement
 @register(np.add)
 @_add_out_support
 def add(x1, x2, /, out):
+    broadcast_obj = np.broadcast(x1, x2)
+    idx_iterator = modded_np.ndindex(broadcast_obj.shape)
+    if out.val is None:
+        out = modded_np.empty(broadcast_obj.shape)
+ 
     if isinstance(x1, cls) and isinstance(x2, cls):
-        return cls(np.add(x1.val, x2.val, out=out.val),
-                   np.add(x1.der, x2.der, out=out.der))
+        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
+            out.val[idx] = x1_elem.val + x2_elem.val
+            out.der[idx] = x1_elem.der + x2_elem.der
+        return cls(out.val, out.der)
+
     elif isinstance(x1, cls):
-        return cls(x1.val + x2, np.positive(x1.der, out=out.der))
+        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
+            out.val[idx] = x1_elem.val + x2_elem
+            out.der[idx] = x1_elem.der
+        return cls(out.val, out.der)
+
     elif isinstance(x2, cls):
-        return cls(x1 + x2.val, np.positive(x2.der, out=out.der))
+        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
+            out.val[idx] = x1_elem + x2_elem.val
+            out.der[idx] = x2_elem.der
+        return cls(out.val, out.der)
     else:
         raise RuntimeError("This should not be occuring.")
 
-
 # Tested
-# TODO: Test broadcasting
 @register(np.subtract)
 @_add_out_support
 def subtract(x1, x2, /, out):
+    broadcast_obj = np.broadcast(x1, x2)
+    idx_iterator = modded_np.ndindex(broadcast_obj.shape)
+    if out.val is None:
+        out = modded_np.empty(broadcast_obj.shape)
+ 
     if isinstance(x1, cls) and isinstance(x2, cls):
-        return cls(np.subtract(x1.val, x2.val, out=out.val),
-                   np.subtract(x1.der, x2.der, out=out.der))
+        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
+            out.val[idx] = x1_elem.val - x2_elem.val
+            out.der[idx] = x1_elem.der - x2_elem.der
+        return cls(out.val, out.der)
+
     elif isinstance(x1, cls):
-        return cls(np.subtract(x1.val, x2, out=out.val),
-                   np.positive(x1.der, out=out.der))
+        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
+            out.val[idx] = x1_elem.val - x2_elem
+            out.der[idx] = x1_elem.der
+        return cls(out.val, out.der)
+
     elif isinstance(x2, cls):
-        return cls(np.subtract(x1, x2.val, out=out.val),
-                   np.negative(x2.der, out=out.der))
+        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
+            out.val[idx] = x1_elem - x2_elem.val
+            out.der[idx] = -x2_elem.der
+        return cls(out.val, out.der)
     else:
         raise RuntimeError("This should not be occuring.")
 
 
 # Tested
-# TODO: Reimplement
 @register(np.multiply)
 @_add_out_support
 def multiply(x1, x2, /, out):
@@ -282,58 +306,98 @@ def multiply(x1, x2, /, out):
 
 
 # Tested
-# TODO: Reimplement
 @register(np.true_divide)
 @_add_out_support
 def true_divide(x1, x2, /, out):
+    broadcast_obj = np.broadcast(x1, x2)
+    idx_iterator = modded_np.ndindex(broadcast_obj.shape)
+    if out.val is None:
+        out = modded_np.empty(broadcast_obj.shape)
+ 
     if isinstance(x1, cls) and isinstance(x2, cls):
-        return cls(np.true_divide(x1.val, x2.val, out=out.val),
-                   np.true_divide(_chain_rule(x2.val, x1.der) -
-                                  _chain_rule(x1.val, x2.der),
-                                  x2.val**2, out=out.der))
+        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
+            out.val[idx] = x1_elem.val / x2_elem.val
+            out.der[idx] = (x1_elem.der * x2_elem.val
+                            - x1_elem.val * x2_elem.der) / x2_elem.val**2
+        return cls(out.val, out.der)
+
     elif isinstance(x1, cls):
-        return cls(np.true_divide(x1.val, x2, out=out.val),
-                   np.true_divide(_chain_rule(x2, x1.der), x2**2, out=out.der))
+        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
+            out.val[idx] = x1_elem.val / x2_elem
+            out.der[idx] = x1_elem.der * x2_elem / x2_elem**2
+        return cls(out.val, out.der)
+
     elif isinstance(x2, cls):
-        return cls(np.true_divide(x1, x2.val, out=out.val),
-                   np.true_divide(-_chain_rule(x1, x2.der), x2.val**2, out=out.der))
+        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
+            out.val[idx] = x1_elem / x2_elem.val
+            out.der[idx] = -x1_elem * x2_elem.der / x2_elem.val**2
+        return cls(out.val, out.der)
+
     else:
         raise RuntimeError("This should not be occuring.")
 
 
-# TODO: Reimplement
 @register(np.float_power)
 @_add_out_support
 def float_power(x1, x2, /, out):
+    broadcast_obj = np.broadcast(x1, x2)
+    idx_iterator = modded_np.ndindex(broadcast_obj.shape)
+    if out.val is None:
+        out = modded_np.empty(broadcast_obj.shape)
+ 
     if isinstance(x1, cls) and isinstance(x2, cls):
-        return cls(np.float_power(x1.val, x2.val, out=out.val),
-                np.multiply(x1.val**(x2.val - 1), (x2.val * x1.der + x1.val * np.log(x1.val) * x2.der), out=out.der))
+        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
+            out.val[idx] = np.float_power(x1_elem.val, x2_elem.val)
+            out.der[idx] = (x1_elem.val**(x2_elem.val - 1))* (x2_elem.val * x1_elem.der + x1_elem.val * np.log(x1_elem.val) * x2_elem.der)
+        return cls(out.val, out.der)
+
     elif isinstance(x1, cls):
-        return cls(np.float_power(x1.val, x2, out=out.val), np.multiply(x1.val**(x2 - 1) * x2, x1.der, out=out.der))
+        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
+            out.val[idx] = np.float_power(x1_elem.val, x2_elem)
+            out.der[idx] = (x1_elem.val**(x2_elem-1))* x2_elem * x1_elem.der
+        return cls(out.val, out.der)
+
     elif isinstance(x2, cls):
-        return cls(np.float_power(x1, x2.val, out=out.val), np.multiply(x1**(x2.val) * np.log(x1.val), x2.der, out=out.der))
+        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
+            out.val[idx] = np.float_power(x1_elem, x2_elem.val)
+            out.der[idx] = (x1_elem**(x2_elem.val)) * np.log(x1_elem) * x2_elem.der
+        return cls(out.val, out.der)
+
     else:
         raise RuntimeError("This should not be occuring.")
 
 
-# TODO: Reimplement
 @register(np.power)
 @_add_out_support
 def power(x1, x2, /, out):
+    broadcast_obj = np.broadcast(x1, x2)
+    idx_iterator = modded_np.ndindex(broadcast_obj.shape)
+    if out.val is None:
+        out = modded_np.empty(broadcast_obj.shape)
+ 
     if isinstance(x1, cls) and isinstance(x2, cls):
-        return cls(np.power(x1.val, x2.val, out=out.val),
-                np.multiply(x1.val**(x2.val - 1), (x2.val * x1.der + x1.val * np.log(x1.val) * x2.der), out=out.der))
+        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
+            out.val[idx] = np.power(x1_elem.val, x2_elem.val)
+            out.der[idx] = (x1_elem.val**(x2_elem.val - 1))* (x2_elem.val * x1_elem.der + x1_elem.val * np.log(x1_elem.val) * x2_elem.der)
+        return cls(out.val, out.der)
+
     elif isinstance(x1, cls):
-        return cls(np.power(x1.val, x2, out=out.val), np.multiply(x1.val**(x2 - 1) * x2, x1.der, out=out.der))
+        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
+            out.val[idx] = np.power(x1_elem.val, x2_elem)
+            out.der[idx] = (x1_elem.val**(x2_elem-1))* x2_elem * x1_elem.der
+        return cls(out.val, out.der)
+
     elif isinstance(x2, cls):
-        return cls(np.power(x1, x2.val, out=out.val), np.multiply(x1**(x2.val) * np.log(x1.val), x2.der, out=out.der))
+        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
+            out.val[idx] = np.power(x1_elem, x2_elem.val)
+            out.der[idx] = (x1_elem**(x2_elem.val)) * np.log(x1_elem) * x2_elem.der
+        return cls(out.val, out.der)
+
     else:
         raise RuntimeError("This should not be occuring.")
 
-
-
-# TODO: Reimplement
 # Partially Tested
+# TODO: Add support for broadcasting.
 @register(np.matmul)
 @_add_out_support
 def matmul(x1, x2, /, out):
