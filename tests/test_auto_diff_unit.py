@@ -114,7 +114,49 @@ class TestSingleVariableAutoDiff(AutoDiffUnitTesting):
         df_dx = np.array([[1.0, 0.0, 0.0], [0.0, 4.0, 0.0], [0, 0, 2.0]])
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
-    
+
+    def test_tanh(self):
+        f = np.tanh
+        x = np.array([[np.log(2)], [-np.log(3)], [0.0]])
+        df_dx = np.array([[0.64, 0.0, 0.0], [0.0, 0.36, 0.0], [0, 0, 1.0]])
+        self._test_helper(f, x, df_dx)
+        self._test_out(f, x, df_dx)
+
+    def test_sinh(self):
+        f = np.sinh
+        x = np.array([[np.log(2)], [-np.log(3)], [0.0]])
+        df_dx = np.array([[1.25, 0.0, 0.0], [0.0, 5 / 3, 0.0], [0, 0, 1.0]])
+        self._test_helper(f, x, df_dx)
+        self._test_out(f, x, df_dx)
+
+    def test_cosh(self):
+        f = np.cosh
+        x = np.array([[np.log(2)], [-np.log(3)], [0.0]])
+        df_dx = np.array([[2.25/3, 0.0, 0.0], [0.0, -4/3, 0.0], [0, 0, 0.0]])
+        self._test_helper(f, x, df_dx)
+        self._test_out(f, x, df_dx)
+
+    def test_arctanh(self):
+        f = np.arctanh
+        x = np.array([[np.sqrt(1/4)], [0.5], [0.0]])
+        df_dx = np.array([[4/3, 0.0, 0.0], [0.0, 1/(1 - 0.5**2), 0.0], [0, 0, 1.0]])
+        self._test_helper(f, x, df_dx)
+        self._test_out(f, x, df_dx)
+
+    def test_arccosh(self):
+        f = np.arccosh
+        x = np.array([[np.sqrt(5)], [np.sqrt(10)], [np.sqrt(17)]])
+        df_dx = np.array([[1/2, 0.0, 0.0], [0.0, 1/3, 0.0], [0, 0, 1.0/4]])
+        self._test_helper(f, x, df_dx)
+        self._test_out(f, x, df_dx)
+
+    def test_arcsinh(self):
+        f = np.arcsinh
+        x = np.array([[np.sqrt(3)], [np.sqrt(8)], [np.sqrt(15)]])
+        df_dx = np.array([[1/2, 0.0, 0.0], [0.0, 1/3, 0.0], [0, 0, 1.0/4]])
+        self._test_helper(f, x, df_dx)
+        self._test_out(f, x, df_dx)
+
     def test_arcsin(self):
         f = np.arcsin
         x = np.array([[0], [np.sqrt(2)/2], [1/2]])
@@ -245,6 +287,19 @@ class TestSingleVariableAutoDiff(AutoDiffUnitTesting):
         [y_1], [y_2] = np.exp(k)
         df_dx = np.diag([y_1, y_2]) @ A
         self._test_helper(lambda x: np.exp(A @ x + b), x, df_dx)
+
+    def test_assign_scalar(self):
+        # x is a size n > 3 vector
+        def f(x):
+            C = 1.0e-7;
+            retval = C * x
+            for i in range(3):
+                retval[i] = 0
+            return retval
+        
+        x = np.array([[4.0], [3.0], [6.0], [7.0]])
+        df_dx = np.array([[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0, 0], [0, 0, 0, 0], [0,0, 0, 1.0e-7]])
+        self._test_helper(f, x, df_dx)
 
 
 class TestMultipleVariableAutoDiff(AutoDiffUnitTesting):
@@ -451,6 +506,11 @@ class TestArbitraryShapeAutoDiff(AutoDiffUnitTesting):
         # x = np.array([[np.pi], [-np.pi/2], [np.pi/4]])
         # df_dx = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0, 0, 1.0]])
         # test(f, x, df_dx, 'transpose')
+
+    def _test_2d_matrix_1d_vector(self):
+        A = np.array([[1, 5., 0.], [3., 6., 2.]])
+        x = np.array([0., 1., 2.])
+        self._test_helper(lambda x: A @ x, x, A)
 
 
 if __name__ == '__main__':
