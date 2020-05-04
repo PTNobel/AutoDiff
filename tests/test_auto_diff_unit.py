@@ -289,7 +289,6 @@ class TestSingleVariableAutoDiff(AutoDiffUnitTesting):
         self._test_helper(lambda x: np.exp(A @ x + b), x, df_dx)
 
     def test_assign_scalar(self):
-        # x is a size n > 3 vector
         def f(x):
             C = 1.0e-7;
             retval = C * x
@@ -300,6 +299,21 @@ class TestSingleVariableAutoDiff(AutoDiffUnitTesting):
         x = np.array([[4.0], [3.0], [6.0], [7.0]])
         df_dx = np.array([[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0, 0], [0, 0, 0, 0], [0,0, 0, 1.0e-7]])
         self._test_helper(f, x, df_dx)
+
+    def test_assign_vector(self):
+        def f(x, u):
+            C = 1.0e-7;
+            retval = C * x
+            for i in range(3):
+                retval[i] = u
+            return retval
+        
+        x = np.array([[4.0], [3.0], [6.0], [7.0]])
+        df_dx = np.array([[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0, 0], [0, 0, 0, 0], [0,0, 0, 1.0e-7]])
+        u = np.array([[1.0]])
+        self._test_helper(lambda x: f(x, u), x, df_dx)
+
+
 
 
 class TestMultipleVariableAutoDiff(AutoDiffUnitTesting):
