@@ -13,7 +13,6 @@ _list_of_masked_functions = [
     'identity',
     'ndarray',
     'array',
-    'ndindex',
     'ones',
     'ones_like',
     'zeros_like',
@@ -21,6 +20,9 @@ _list_of_masked_functions = [
     'empty_like',
     'full',
     'full_like',
+
+    'ndindex',
+    'broadcast_to',
 ]
 
 
@@ -198,3 +200,7 @@ class AutoDiff:
     def ndindex(self, *shape):
         with WithTrueNumpy():
             return np.ndindex(*shape)
+
+    def broadcast_to(self, array, shape, subok=False):
+        with WithTrueNumpy():
+            return np.broadcast_to(array, shape, subok)

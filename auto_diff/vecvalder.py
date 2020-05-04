@@ -80,8 +80,9 @@ class VecValDer(np.lib.mixins.NDArrayOperatorsMixin):
             # We're being passed a scalar? Or something weird?
             # Like vec[:] = other_vec?
             value = np.asarray(value)
-            assert self.val[key].shape == value.shape
-            self.val[key] = value
+            value_reshaped = np.broadcast_to(value, self.val[key].shape)
+            assert self.val[key].shape == value_reshaped.shape
+            self.val[key] = value_reshaped
             self.der[key] = true_np.zeros(self.der[key].shape)
 
     def __getitem__(self, key):
