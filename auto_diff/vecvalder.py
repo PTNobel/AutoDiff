@@ -14,8 +14,8 @@ class VecValDer(np.lib.mixins.NDArrayOperatorsMixin):
     __slots__ = 'val', 'der'
 
     def __init__(self, val, der):
-        self.val = val
-        self.der = der
+        self.val = np.asanyarray(val)
+        self.der = np.asanyarray(der)
 
     @property
     def T(self):
