@@ -78,7 +78,7 @@ class VecValDer(np.lib.mixins.NDArrayOperatorsMixin):
             self.der[key] = value.der
         else:
             self.val[key] = value
-            self.der[key] = true_np.zeros(self.der[key].shape)
+            self.der[key] = 0
 
     def __getitem__(self, key):
         return VecValDer(self.val[key], self.der[key])
