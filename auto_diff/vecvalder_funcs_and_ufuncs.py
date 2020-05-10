@@ -6,6 +6,23 @@ import numpy as modded_np
 cls = VecValDer
 
 
+# On 5-Stage Ring Oscillator example from PyMAPP, using this instead of
+# np.ndindex reduced a 200 s simulation to 150 s.
+def _ndindex(shape):
+    state = [0 for _ in shape]
+    total = 0
+    stop_condition = np.product(shape)
+    while total < stop_condition:
+        total += 1
+        yield tuple(state)
+        for i in range(-1, -1 -len(shape), -1):
+            state[i] += 1
+            if state[i] == shape[i]:
+                state[i] = 0
+            else:
+                break
+
+
 class FeaturelessVecValDer:
     __slots__ = 'val', 'der'
     def __init__(self, val, der):
@@ -259,7 +276,7 @@ def positive(x, /, out):
 @_add_out_support
 def add(x1, x2, /, out):
     broadcast_obj = np.broadcast(x1, x2)
-    idx_iterator = modded_np.ndindex(broadcast_obj.shape)
+    idx_iterator = _ndindex(broadcast_obj.shape)
     if out.val is None:
         out = modded_np.empty(broadcast_obj.shape)
  
@@ -288,7 +305,7 @@ def add(x1, x2, /, out):
 @_add_out_support
 def subtract(x1, x2, /, out):
     broadcast_obj = np.broadcast(x1, x2)
-    idx_iterator = modded_np.ndindex(broadcast_obj.shape)
+    idx_iterator = _ndindex(broadcast_obj.shape)
     if out.val is None:
         out = modded_np.empty(broadcast_obj.shape)
  
@@ -318,7 +335,7 @@ def subtract(x1, x2, /, out):
 @_add_out_support
 def multiply(x1, x2, /, out):
     broadcast_obj = np.broadcast(x1, x2)
-    idx_iterator = modded_np.ndindex(broadcast_obj.shape)
+    idx_iterator = _ndindex(broadcast_obj.shape)
     if out.val is None:
         out = modded_np.empty(broadcast_obj.shape)
  
@@ -349,7 +366,7 @@ def multiply(x1, x2, /, out):
 @_add_out_support
 def true_divide(x1, x2, /, out):
     broadcast_obj = np.broadcast(x1, x2)
-    idx_iterator = modded_np.ndindex(broadcast_obj.shape)
+    idx_iterator = _ndindex(broadcast_obj.shape)
     if out.val is None:
         out = modded_np.empty(broadcast_obj.shape)
  
@@ -380,7 +397,7 @@ def true_divide(x1, x2, /, out):
 @_add_out_support
 def float_power(x1, x2, /, out):
     broadcast_obj = np.broadcast(x1, x2)
-    idx_iterator = modded_np.ndindex(broadcast_obj.shape)
+    idx_iterator = _ndindex(broadcast_obj.shape)
     if out.val is None:
         out = modded_np.empty(broadcast_obj.shape)
  
@@ -410,7 +427,7 @@ def float_power(x1, x2, /, out):
 @_add_out_support
 def power(x1, x2, /, out):
     broadcast_obj = np.broadcast(x1, x2)
-    idx_iterator = modded_np.ndindex(broadcast_obj.shape)
+    idx_iterator = _ndindex(broadcast_obj.shape)
     if out.val is None:
         out = modded_np.empty(broadcast_obj.shape)
  
@@ -448,7 +465,7 @@ def matmul(x1, x2, /, out):
             der = np.ndarray((*val.shape, *x1.der.shape[-2:]))
         else:
             der = out.der
-        for i, k in modded_np.ndindex(val.shape):
+        for i, k in _ndindex(val.shape):
             der[i, k] = sum(
                 x1.val[i, j] * x2.der[j, k] + x1.der[i, j] * x2.val[j, k]
                 for j in range(x1.shape[1]))
@@ -462,7 +479,7 @@ def matmul(x1, x2, /, out):
             der = np.ndarray((*val.shape, *x1.der.shape[-2:]))
         else:
             der = out.der
-        for i, k in modded_np.ndindex(val.shape):
+        for i, k in _ndindex(val.shape):
             der[i, k] = sum(x1.der[i, j] * x2[j, k]
                             for j in range(x1.shape[1]))
         return cls(val, der)
@@ -475,7 +492,7 @@ def matmul(x1, x2, /, out):
             der = np.ndarray((*val.shape, *x2.der.shape[-2:]))
         else:
             der = out.der
-        for i, k in modded_np.ndindex(val.shape):
+        for i, k in _ndindex(val.shape):
             der[i, k] = sum(x1[i, j] * x2.der[j, k]
                             for j in range(x1.shape[1]))
         return cls(val, der)
