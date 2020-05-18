@@ -1,3 +1,6 @@
+
+* Run tests.
+
 * Update version in setup.py
 
 * Generate wheel and source archive.
