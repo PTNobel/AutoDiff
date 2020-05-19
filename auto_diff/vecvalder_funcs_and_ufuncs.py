@@ -47,7 +47,6 @@ def _derivative_independent_comparison_ufunc(fn):
 
 
 _none_vec_val_der = FeaturelessVecValDer(None, None)
-# Define a decorator which adds out support, erroring on non-vecvalder  
 
 
 # This is probably a good C/Cython candidate
