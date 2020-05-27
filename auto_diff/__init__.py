@@ -117,10 +117,12 @@ Version: 0.2
 
 from . import true_np
 from . import vecvalder_funcs_and_ufuncs as masked_functions
+from . import sparsevecvalder_funcs_and_ufuncs as sparse_masked_functions
 
 from .numpy_masking import AutoDiff
 from .numpy_masking import _active_auto_diffs
 
+from .sparse_numpy_masking import SparseAutoDiff
 
 def get_value_and_jacobians(x):
     """Extracts values and jacobians from the value of a function,
@@ -148,6 +150,8 @@ def get_value_and_jacobian(x):
     import numpy as np
     if isinstance(x, true_np.ndarray):
         x = np.array(x)
+    elif isinstance(_active_auto_diffs[-1], SparseAutoDiff):
+        return x.val, jacobian(x)
     if x.der.shape[-1] == 0:
         assert x.der.shape[2] == 1
         return x.val, true_np.ndarray((-1, 0))
@@ -158,6 +162,10 @@ def jacobian(x):
     import numpy as np
     if isinstance(x, true_np.ndarray):
         x = np.array(x)
+
+    if isinstance(_active_auto_diffs[-1], SparseAutoDiff):
+        return x.der
+
     if x.der.shape[-1] == 0:
         assert x.der.shape[2] == 1
         return true_np.ndarray((x.der.shape[0], 0))
