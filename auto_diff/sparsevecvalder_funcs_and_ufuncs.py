@@ -24,12 +24,85 @@ def _ndindex(shape):
                 break
 
 
+class ScalarAsArrayWrapper:
+    __slots__ = 'scalar', 'shape', 'flat'
+
+    def __init__(self, scalar):
+        self.scalar = scalar
+        self.shape = ()
+        self.flat = self
+
+    def __getitem__(self, idx):
+        return self.scalar
+
+    def __array_function__(self, func, types, args, kwargs):
+        if func is np.size:
+            return 1
+        else:
+            return NotImplemented
+
+
+_empty_lil = scipy.sparse.lil_matrix([[]])
+def _combine_lil_rows(combine_func, x, y, out_idx, out_data):
+    x_iter = zip(x.rows[0], x.data[0])
+    y_iter = zip(y.rows[0], y.data[0])
+
+    try:
+        x_idx, x_val = next(x_iter)
+        y_idx, y_val = next(y_iter)
+
+        while True:
+            if x_idx == y_idx:
+                out_idx.append(x_idx)
+                out_data.append(combine_func(x_val, y_val))
+                x_idx, x_val = next(x_iter)
+                y_idx, y_val = next(y_iter)
+            elif x_idx < y_idx:
+                out_idx.append(x_idx)
+                out_data.append(combine_func(x_val, 0.0))
+                x_idx, x_val = next(x_iter)
+            elif x_idx > y_idx:
+                out_idx.append(y_idx)
+                out_data.append(combine_func(0.0, y_val))
+                y_idx, y_val = next(y_iter)
+    except StopIteration:
+        pass
+
+    try:
+        # consume x_iter
+        while True:
+            x_idx, x_val = next(x_iter)
+            out_idx.append(x_idx)
+            out_data.append(combine_func(x_val, 0.0))
+    except StopIteration:
+        pass
+
+    try:
+        # consume y_iter
+        while True:
+            y_idx, y_val = next(y_iter)
+            out_idx.append(y_idx)
+            out_data.append(combine_func(0.0, y_val))
+    except StopIteration:
+        pass
+
+
+
+
 class FeaturelessVecValDer:
     __slots__ = 'val', 'der'
     def __init__(self, val, der):
         self.val = val
         self.der = der
+    """
+    @property
+    def val(self):
+        return self.__val
 
+    @property
+    def der(self):
+        return self.__der
+    """
 
 def _derivative_independent_comparison_ufunc(fn):
     def wrapped_function(x1, x2, **kwargs):
@@ -60,11 +133,11 @@ def _simple_index_to_square_index(i, shape):
 
 def _square_index_to_simple_index(idx, shape):
     assert len(idx) == len(shape)
-    multiplier = 1
     out = 0
-    for i, axis_dim in reversed(zip(idx, shape)):
-        multiplier *= axis_dim
+    multiplier = 1
+    for i, axis_dim in zip(reversed(idx), reversed(shape)):
         out += i * multiplier
+        multiplier *= axis_dim
     return out
 
 
@@ -80,33 +153,96 @@ def _chain_rule(f_x, dx, out=None):
     # we're about to overwrite each element. If we do compression of the for
     # loop in the future be sure to switch to np.zeros.
     flat_f_x = f_x.flat
-    for i, j, partial_x in zip(*scipy.sparse.find(dx)):
-        out[i, j] = flat_f_x[i] * partial_x
+    for i, (f_x_i, grad_of_x, idx_of_grad) in enumerate(zip(flat_f_x, dx.data, dx.rows)):
+        for j, partial_x in zip(idx_of_grad, grad_of_x):
+            out[i, j] = f_x_i * partial_x
+
     return out
 
 
 # Add support for where=
-def _add_out_support(fn):
-    def fn_with_out(*args, out=None, where=True, **kwargs):
-        if where is not True:
-            raise NotImplementedError("Have yet to implement where support")
-        if out is None:
-            out = _none_vec_val_der
-        elif isinstance(out, tuple):
-            if len(out) == 1:
-                out = out[0]
+def _add_out_support(mutable_out=False):
+    def decorator(fn):
+        def fn_with_out(*args, out=None, where=True, **kwargs):
+            if where is not True:
+                raise NotImplementedError("Have yet to implement where support")
+            if out is None and not mutable_out:
+                out = _none_vec_val_der
+            elif out is None and mutable_out:
+                out = FeaturelessVecValDer(None, None)
+            elif isinstance(out, tuple):
+                if len(out) == 1:
+                    out = out[0]
+                else:
+                    out = FeaturelessVecValDer(tuple(arg.val for arg in out),
+                                            tuple(arg.der for arg in out))
+            elif isinstance(out, cls):
+                pass
             else:
-                out = FeaturelessVecValDer(tuple(arg.val for arg in out),
-                                           tuple(arg.der for arg in out))
-        elif isinstance(out, cls):
-            pass
+                raise RuntimeError("""Unknown type passed as out parameter.""")
+
+            return fn(*args, out=out, **kwargs)
+
+        fn_with_out.__name__ = fn.__name__
+        return fn_with_out
+
+    if isinstance(mutable_out, bool):
+        return decorator
+    else:
+        value = mutable_out
+        mutable_out = False
+        return decorator(value)
+
+
+def _generate_two_argument_broadcasting_function(name, combine_val, combine_der):
+    """
+    * combine_val: Callable[[x, y], out] | Callable[[float, float], float]
+    * combine_der: Callable[[x, y, dx, dy], dout] | Callable[[float, float, float, float], float]
+    """
+    @_add_out_support
+    def fn(x1, x2, /, out):
+        if np.isscalar(x1):
+            x1 = ScalarAsArrayWrapper(x1)
+
+        if np.isscalar(x2):
+            x2 = ScalarAsArrayWrapper(x2)
+
+        x1_index = np.arange(np.size(x1)).reshape(x1.shape)
+        x2_index = np.arange(np.size(x2)).reshape(x2.shape)
+
+        broadcast_obj = np.broadcast(x1_index, x2_index)
+        idx_iterator = _ndindex(broadcast_obj.shape)
+        if out.val is None:
+            out = modded_np.empty(broadcast_obj.shape)
+
+        if isinstance(x1, cls) and isinstance(x2, cls):
+            x1_flat = x1.val.flat
+            x2_flat = x2.val.flat
+            x1_der = x1.der
+            x2_der = x2.der
+        elif isinstance(x1, cls):
+            x1_flat = x1.val.flat
+            x2_flat = x2.flat
+            x1_der = x1.der
+            x2_der = ScalarAsArrayWrapper(_empty_lil)
+        elif isinstance(x2, cls):
+            x1_flat = x1.flat
+            x2_flat = x2.val.flat
+            x1_der = ScalarAsArrayWrapper(_empty_lil)
+            x2_der = x2.der
         else:
-            raise RuntimeError("""Unknown type passed as out parameter.""")
+            raise RuntimeError("This should not be occuring.")
 
-        return fn(*args, out=out, **kwargs)
+        for idx, (x1_elem_idx, x2_elem_idx) in zip(idx_iterator, broadcast_obj):
+            x1_val_idx = x1_flat[x1_elem_idx]
+            x2_val_idx = x2_flat[x2_elem_idx]
+            out.val[idx] = combine_val(x1_val_idx, x2_val_idx)
+            out_idx = _square_index_to_simple_index(idx, out.val.shape)
+            _combine_lil_rows(lambda dx, dy: combine_der(x1_val_idx, x2_val_idx, dx, dy), x1_der[x1_elem_idx], x2_der[x2_elem_idx], out.der.rows[out_idx], out.der.data[out_idx])
+        return cls(out.val, out.der)
 
-    fn_with_out.__name__ = fn.__name__
-    return fn_with_out
+    fn.__name__ = name
+    return fn
 
 
 @register(np.transpose)
@@ -278,208 +414,64 @@ def log1p(x, /, out):
 
 # Tested
 @register(np.negative)
-@_add_out_support
+@_add_out_support(mutable_out=True)
 def negative(x, /, out):
-    return cls(np.negative(x.val, out=out.val), np.negative(x.der, out=out.der))
+    if out.der is None:
+        out.der = scipy.sparse.lil_matrix(x.der.shape)
+
+    for i, (grad_idx, grad_x) in enumerate(zip(x.der.rows, x.der.data)):
+        for j, dx in zip(grad_idx, grad_x):
+            out.der[i, j] = -dx
+
+    return cls(np.negative(x.val, out=out.val), out.der)
 
 
 # Tested
 @register(np.positive)
-@_add_out_support
+@_add_out_support(True)
 def positive(x, /, out):
     if out.der is None:
-        out.der = x.der
-    else:
-        out.der[:] = x.der
+        out.der = scipy.sparse.lil_matrix(x.der.shape)
+
+    for i, (grad_idx, grad_x) in enumerate(zip(x.der.rows, x.der.data)):
+        for j, dx in zip(grad_idx, grad_x):
+            out.der[i, j] = dx
+
     return cls(np.positive(x.val, out=out.val), out.der)
 
 
-# Tested
-@register(np.add)
-@_add_out_support
-def add(x1, x2, /, out):
-    broadcast_obj = np.broadcast(x1, x2)
-    idx_iterator = _ndindex(broadcast_obj.shape)
-    if out.val is None:
-        out = modded_np.empty(broadcast_obj.shape)
- 
-    if isinstance(x1, cls) and isinstance(x2, cls):
-        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
-            out.val[idx] = x1_elem.val + x2_elem.val
-            out.der[idx] = x1_elem.der + x2_elem.der
-        return cls(out.val, out.der)
-
-    elif isinstance(x1, cls):
-        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
-            out.val[idx] = x1_elem.val + x2_elem
-            out.der[idx] = x1_elem.der
-        return cls(out.val, out.der)
-
-    elif isinstance(x2, cls):
-        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
-            out.val[idx] = x1_elem + x2_elem.val
-            out.der[idx] = x2_elem.der
-        return cls(out.val, out.der)
-    else:
-        raise RuntimeError("This should not be occuring.")
 
 # Tested
-@register(np.subtract)
-@_add_out_support
-def subtract(x1, x2, /, out):
-    broadcast_obj = np.broadcast(x1, x2)
-    idx_iterator = _ndindex(broadcast_obj.shape)
-    if out.val is None:
-        out = modded_np.empty(broadcast_obj.shape)
- 
-    if isinstance(x1, cls) and isinstance(x2, cls):
-        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
-            out.val[idx] = x1_elem.val - x2_elem.val
-            out.der[idx] = x1_elem.der - x2_elem.der
-        return cls(out.val, out.der)
-
-    elif isinstance(x1, cls):
-        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
-            out.val[idx] = x1_elem.val - x2_elem
-            out.der[idx] = x1_elem.der
-        return cls(out.val, out.der)
-
-    elif isinstance(x2, cls):
-        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
-            out.val[idx] = x1_elem - x2_elem.val
-            out.der[idx] = -x2_elem.der
-        return cls(out.val, out.der)
-    else:
-        raise RuntimeError("This should not be occuring.")
-
+add = _generate_two_argument_broadcasting_function('add', lambda x, y: x + y, lambda _x, _y, dx, dy: dx + dy)
+register(np.add)(add)
 
 # Tested
-@register(np.multiply)
-@_add_out_support
-def multiply(x1, x2, /, out):
-    broadcast_obj = np.broadcast(x1, x2)
-    idx_iterator = _ndindex(broadcast_obj.shape)
-    if out.val is None:
-        out = modded_np.empty(broadcast_obj.shape)
- 
-    if isinstance(x1, cls) and isinstance(x2, cls):
-        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
-            out.val[idx] = x1_elem.val * x2_elem.val
-            out.der[idx] = x1_elem.der * x2_elem.val + x1_elem.val * x2_elem.der
-        return cls(out.val, out.der)
-
-    elif isinstance(x1, cls):
-        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
-            out.val[idx] = x1_elem.val * x2_elem
-            out.der[idx] = x1_elem.der * x2_elem
-        return cls(out.val, out.der)
-
-    elif isinstance(x2, cls):
-        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
-            out.val[idx] = x1_elem * x2_elem.val
-            out.der[idx] = x1_elem * x2_elem.der
-        return cls(out.val, out.der)
-
-    else:
-        raise RuntimeError("This should not be occuring.")
-
+subtract = _generate_two_argument_broadcasting_function('subtract', lambda x, y: x - y, lambda _x, _y, dx, dy: dx - dy)
+register(np.subtract)(subtract)
 
 # Tested
-@register(np.true_divide)
-@_add_out_support
-def true_divide(x1, x2, /, out):
-    broadcast_obj = np.broadcast(x1, x2)
-    idx_iterator = _ndindex(broadcast_obj.shape)
-    if out.val is None:
-        out = modded_np.empty(broadcast_obj.shape)
- 
-    if isinstance(x1, cls) and isinstance(x2, cls):
-        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
-            out.val[idx] = x1_elem.val / x2_elem.val
-            out.der[idx] = (x1_elem.der * x2_elem.val
-                            - x1_elem.val * x2_elem.der) / x2_elem.val**2
-        return cls(out.val, out.der)
+multiply = _generate_two_argument_broadcasting_function('multiply', lambda x, y: x * y, lambda x, y, dx, dy: x * dy + y * dx)
+register(np.multiply)(multiply)
 
-    elif isinstance(x1, cls):
-        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
-            out.val[idx] = x1_elem.val / x2_elem
-            out.der[idx] = x1_elem.der * x2_elem / x2_elem**2
-        return cls(out.val, out.der)
+# Tested
+true_divide = _generate_two_argument_broadcasting_function('true_divide', lambda x, y: x / y, lambda x, y, dx, dy:  (y * dx - x * dy)(y**2))
+register(np.true_divide)(true_divide)
 
-    elif isinstance(x2, cls):
-        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
-            out.val[idx] = x1_elem / x2_elem.val
-            out.der[idx] = -x1_elem * x2_elem.der / x2_elem.val**2
-        return cls(out.val, out.der)
+# Tested
+float_power = _generate_two_argument_broadcasting_function('float_power', lambda x, y: np.float_power(x, y), lambda x, y, dx, dy: (x**(y - 1)) * (y * dx + x * np.log(x) * dy))
+register(np.float_power)(float_power)
 
-    else:
-        raise RuntimeError("This should not be occuring.")
-
-
-@register(np.float_power)
-@_add_out_support
-def float_power(x1, x2, /, out):
-    broadcast_obj = np.broadcast(x1, x2)
-    idx_iterator = _ndindex(broadcast_obj.shape)
-    if out.val is None:
-        out = modded_np.empty(broadcast_obj.shape)
- 
-    if isinstance(x1, cls) and isinstance(x2, cls):
-        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
-            out.val[idx] = np.float_power(x1_elem.val, x2_elem.val)
-            out.der[idx] = (x1_elem.val**(x2_elem.val - 1))* (x2_elem.val * x1_elem.der + x1_elem.val * np.log(x1_elem.val) * x2_elem.der)
-        return cls(out.val, out.der)
-
-    elif isinstance(x1, cls):
-        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
-            out.val[idx] = np.float_power(x1_elem.val, x2_elem)
-            out.der[idx] = (x1_elem.val**(x2_elem-1))* x2_elem * x1_elem.der
-        return cls(out.val, out.der)
-
-    elif isinstance(x2, cls):
-        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
-            out.val[idx] = np.float_power(x1_elem, x2_elem.val)
-            out.der[idx] = (x1_elem**(x2_elem.val)) * np.log(x1_elem) * x2_elem.der
-        return cls(out.val, out.der)
-
-    else:
-        raise RuntimeError("This should not be occuring.")
-
-
-@register(np.power)
-@_add_out_support
-def power(x1, x2, /, out):
-    broadcast_obj = np.broadcast(x1, x2)
-    idx_iterator = _ndindex(broadcast_obj.shape)
-    if out.val is None:
-        out = modded_np.empty(broadcast_obj.shape)
- 
-    if isinstance(x1, cls) and isinstance(x2, cls):
-        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
-            out.val[idx] = np.power(x1_elem.val, x2_elem.val)
-            out.der[idx] = (x1_elem.val**(x2_elem.val - 1))* (x2_elem.val * x1_elem.der + x1_elem.val * np.log(x1_elem.val) * x2_elem.der)
-        return cls(out.val, out.der)
-
-    elif isinstance(x1, cls):
-        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
-            out.val[idx] = np.power(x1_elem.val, x2_elem)
-            out.der[idx] = (x1_elem.val**(x2_elem-1))* x2_elem * x1_elem.der
-        return cls(out.val, out.der)
-
-    elif isinstance(x2, cls):
-        for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
-            out.val[idx] = np.power(x1_elem, x2_elem.val)
-            out.der[idx] = (x1_elem**(x2_elem.val)) * np.log(x1_elem) * x2_elem.der
-        return cls(out.val, out.der)
-
-    else:
-        raise RuntimeError("This should not be occuring.")
+# Tested
+power = _generate_two_argument_broadcasting_function('power', lambda x, y: np.power(x,y), lambda x, y, dx, dy: (x**(y - 1)) * (y * dx + x * np.log(x) * dy))
+register(np.power)(power)
 
 # Partially Tested
 # TODO: Add support for broadcasting.
 @register(np.matmul)
 @_add_out_support
 def matmul(x1, x2, /, out):
+    raise NotImplementedError("matmul has not been built yet")
+
     if isinstance(x1, cls) and isinstance(x2, cls):
         val = np.matmul(x1.val, x2.val, out=out.val)
         # Find a way to write der as numpy primitives.
@@ -552,5 +544,9 @@ not_equal = _derivative_independent_comparison_ufunc(np.not_equal)
 register(np.not_equal)(not_equal)
 
 @register(np.isfinite)
-def isfinite(x):
-    return np.isfinite(x.val)
+def isfinite(x, /, out=None, *args, **kwargs):
+    return np.isfinite(x.val, out=out, *args, **kwargs)
+
+@register(np.size)
+def size(x, axis=None):
+    return np.size(x.val, axis=axis)

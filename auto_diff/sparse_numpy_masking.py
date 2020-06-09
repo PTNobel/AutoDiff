@@ -5,6 +5,9 @@ from . import true_np
 from . import numpy_masking
 
 
+# TODO: Check for any kwargs, if you've recieved any, immediately defer to the
+# default function. Add documentation.
+
 # TODO: Add vstack hstack stack dstack concatenate vsplit block
 class SparseAutoDiff:
     def __init__(self, *vecs):
@@ -75,9 +78,9 @@ class SparseAutoDiff:
 
         return val_rows, der_rows
 
-    def array(self, obj, dtype=None, copy=True):
-        if dtype is not None:
-            return true_np.array(obj, dtype=dtype, copy=copy)
+    def array(self, obj, **kwargs):
+        if len(kwargs) > 0:
+            return true_np.array(obj, **kwargs)
         if isinstance(obj, SparseVecValDer):
             return SparseVecValDer(obj.val, obj.der)
         elif hasattr(obj, '__array_interface__') \
