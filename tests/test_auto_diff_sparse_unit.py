@@ -3,12 +3,14 @@ import unittest
 import auto_diff
 import numpy as np
 
-class AutoDiffUnitTesting(unittest.TestCase):
+class SparseAutoDiffUnitTesting(unittest.TestCase):
     def _assertAllClose(self, actual, desired, rtol=1e-07, atol=1e-12, equal_nan=True):
+        if not isinstance(actual, np.ndarray):
+            actual = actual.toarray()
         np.testing.assert_allclose(actual, desired, rtol, atol, equal_nan)
 
 
-class TestSingleVariableSparseAutoDiff(AutoDiffUnitTesting):
+class TestSingleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
     def _test_helper(self, f, x, df_dx, debug=False):
         if debug:
             breakpoint()
@@ -20,7 +22,7 @@ class TestSingleVariableSparseAutoDiff(AutoDiffUnitTesting):
 
         self._assertAllClose(y, f_x)
         self._assertAllClose(Jf, df_dx)
-    
+
         # Some bugs only appeared with rectangular Jacobians.
         A = np.random.rand(input_x.shape[0], 3 * input_x.shape[0])
         b = np.random.rand(input_x.shape[0], 1)
@@ -41,7 +43,7 @@ class TestSingleVariableSparseAutoDiff(AutoDiffUnitTesting):
         f_x = f(input_x)
 
         with auto_diff.SparseAutoDiff(input_x) as x:
-            out_dest = np.ndarray(f_x.shape)
+            out_dest = np.empty(f_x.shape)
             f(x, out=out_dest)
             y, Jf = auto_diff.get_value_and_jacobian(out_dest)
 
@@ -51,7 +53,7 @@ class TestSingleVariableSparseAutoDiff(AutoDiffUnitTesting):
     def test_add_with_out(self):
         def f(x):
             y = np.sqrt(x)
-            out = np.ndarray((3, 1))
+            out = np.empty((3, 1))
             np.add(x, y, out=out)
             return out
         x = np.array([[2.], [4.], [9.0]])
@@ -63,7 +65,7 @@ class TestSingleVariableSparseAutoDiff(AutoDiffUnitTesting):
     def test_multiply_with_out(self):
         def f(x):
             y = np.sqrt(x)
-            out = np.ndarray((3, 1))
+            out = np.empty((3, 1))
             np.multiply(x, y, out=out)
             return out
         x = np.array([[2.], [4.], [9.0]])
@@ -316,7 +318,7 @@ class TestSingleVariableSparseAutoDiff(AutoDiffUnitTesting):
 
 
 
-class TestMultipleVariableSparseAutoDiff(AutoDiffUnitTesting):
+class TestMultipleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
     def _test_helper(self, f, x, u, df_dx, df_du, debug=False):
         if debug:
             breakpoint()
@@ -498,7 +500,7 @@ class TestMultipleVariableSparseAutoDiff(AutoDiffUnitTesting):
 
         self._test_helper(f, x, u, df_dx, df_du)
 
-class TestArbitraryShapeSparseAutoDiff(AutoDiffUnitTesting):
+class TestArbitraryShapeSparseAutoDiff(SparseAutoDiffUnitTesting):
     def _test_helper(self, f, x, df_dx, debug=False):
         if debug:
             breakpoint()
