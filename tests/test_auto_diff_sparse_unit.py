@@ -46,9 +46,13 @@ class TestSingleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
             out_dest = np.empty(f_x.shape)
             f(x, out=out_dest)
             y, Jf = auto_diff.get_value_and_jacobian(out_dest)
+            f(x, out=out_dest)
+            y2, Jf2 = auto_diff.get_value_and_jacobian(out_dest)
 
         self._assertAllClose(f_x, y)
         self._assertAllClose(Jf, df_dx)
+        self._assertAllClose(f_x, y2)
+        self._assertAllClose(Jf2, df_dx)
 
     def test_add_with_out(self):
         def f(x):
