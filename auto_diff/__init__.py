@@ -133,10 +133,18 @@ def get_value_and_jacobians(x):
     import numpy as np
     if isinstance(x, true_np.ndarray):
         x = np.array(x)
-    shared_axes = tuple(slice(None) for _ in x.val.shape)
-
+    
     jacobians = []
     total = 0
+
+    if isinstance(_active_auto_diffs[-1], SparseAutoDiff):
+        for vec in _active_auto_diffs[-1].vecs:
+            jacobians.append(x.der[:, total:total + np.size(vec)])
+            total += np.size(vec)
+
+        return x.val, tuple(jacobians)
+
+    shared_axes = tuple(slice(None) for _ in x.val.shape)
     for vec in _active_auto_diffs[-1].vecs:
         idx = (*shared_axes, slice(total, total + vec.shape[0]), slice(None))
         jacobians.append(
