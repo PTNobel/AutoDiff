@@ -5,6 +5,21 @@ from . import true_np
 from . import numpy_masking
 
 
+def _vstack_lil_matrix(matrices):
+    M = sum(m.shape[0] for m in matrices)
+    N = (s := set(m.shape[1] for m in matrices)).pop()
+    assert len(s) == 0, "Mixing SparseVecValDer's from multiple sessions?"
+    # [N] = set(m.shape[1] for m in matrices)
+
+    output = scipy.sparse.lil_matrix((M, N))
+    total = 0
+    for m in matrices:
+        output[total:total + m.shape[0]] = m
+        total += m.shape[0]
+
+    return output
+
+
 # TODO: Check for any kwargs, if you've recieved any, immediately defer to the
 # default function. Add documentation.
 
@@ -48,7 +63,9 @@ class SparseAutoDiff:
         der = scipy.sparse.lil_matrix((np.size(val), np.size(self.x)))
         return SparseVecValDer(val, der)
 
-    def zeros(self, shape):
+    def zeros(self, shape, **kwargs):
+        if len(kwargs) > 0:
+            return true_np.zeros(shape, **kwargs)
         val = true_np.zeros(shape)
         return self._build_vec_val_der(val)
 
@@ -73,28 +90,30 @@ class SparseAutoDiff:
             else:
                 sub_val_rows, sub_der_rows = self._parse_list_of_items(item)
                 val_rows.append(sub_val_rows)
-                raise NotImplementedError("Fix the way we combine the der_rows")
-                der_rows.append(sub_der_rows)
+                der_rows.append(_vstack_lil_matrix(sub_der_rows))
 
         return val_rows, der_rows
 
     def array(self, obj, **kwargs):
         if len(kwargs) > 0:
             return true_np.array(obj, **kwargs)
+
         if isinstance(obj, SparseVecValDer):
             return SparseVecValDer(obj.val, obj.der)
+
         elif hasattr(obj, '__array_interface__') \
                 or hasattr(obj, '__array__'):
             val = true_np.array(obj)
             return self._build_vec_val_der(val)
+
         elif np.isscalar(obj):
             val = true_np.array(obj)
             return self._build_vec_val_der(val)
+
         else:
             val_rows, der_rows = self._parse_list_of_items(obj)
             val = true_np.array(val_rows)
-            raise NotImplementedError("Fix the way we turn der into a lil_matrix")
-            der = true_np.array(der_rows)
+            der = _vstack_lil_matrix(der_rows)
             return SparseVecValDer(val, der)
 
     def eye(self, N, M=None, k=0):

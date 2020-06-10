@@ -571,7 +571,7 @@ def matmul(x1, x2, /, out):
         val = np.matmul(x1.val, x2.val, out=out.val)
 
         if out.der is None:
-            der = scipy.sparse.lil_matrix((np.size(val), x1.der.size[1]))
+            der = scipy.sparse.lil_matrix((np.size(val), x1.der.shape[1]))
         else:
             der = out.der
 
