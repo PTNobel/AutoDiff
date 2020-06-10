@@ -94,7 +94,7 @@ class PairedIterator:
             raise
 
 _empty_lil = scipy.sparse.lil_matrix([[]])
-def _combine_lil_rows(combine_func, x, y, out_idx, out_data):
+def _combine_lil_rows(combine_func, combine_left, combine_right, x, y, out_idx, out_data):
     paired_iter = PairedIterator(zip(x.rows[0], x.data[0]), zip(y.rows[0], y.data[0]))
     out_idx.clear()
     out_data.clear()
@@ -106,11 +106,11 @@ def _combine_lil_rows(combine_func, x, y, out_idx, out_data):
                 paired_iter.advance_both()
             elif paired_iter.left_value[0] < paired_iter.right_value[0]:
                 out_idx.append(paired_iter.left_value[0])
-                out_data.append(combine_func(paired_iter.left_value[1], 0.0))
+                out_data.append(combine_left(paired_iter.left_value[1]))
                 paired_iter.advance_left()
             elif paired_iter.left_value[0] > paired_iter.right_value[0]:
                 out_idx.append(paired_iter.right_value[0])
-                out_data.append(combine_func(paired_iter.right_value[1], 0.0))
+                out_data.append(combine_right(paired_iter.right_value[1]))
                 paired_iter.advance_right()
     except StopIteration:
         pass
@@ -119,7 +119,7 @@ def _combine_lil_rows(combine_func, x, y, out_idx, out_data):
         # consume left
         while True:
             out_idx.append(paired_iter.left_value[0])
-            out_data.append(combine_func(paired_iter.left_value[1], 0.0))
+            out_data.append(combine_left(paired_iter.left_value[1]))
             paired_iter.advance_left()
     except StopIteration:
         pass
@@ -128,7 +128,7 @@ def _combine_lil_rows(combine_func, x, y, out_idx, out_data):
         # consume right
         while True:
             out_idx.append(paired_iter.right_value[0])
-            out_data.append(combine_func(0.0, paired_iter.right_value[1]))
+            out_data.append(combine_right(paired_iter.right_value[1]))
             paired_iter.advance_right()
     except StopIteration:
         pass
@@ -241,10 +241,12 @@ def _add_out_support(mutable_out=False):
         return decorator(value)
 
 
-def _generate_two_argument_broadcasting_function(name, combine_val, combine_der):
+def _generate_two_argument_broadcasting_function(name, combine_val, combine_der, combine_der_left, combine_der_right):
     """
     * combine_val: Callable[[x, y], out] | Callable[[float, float], float]
     * combine_der: Callable[[x, y, dx, dy], dout] | Callable[[float, float, float, float], float]
+    * combine_der_left: Callable[[x, y, dx], dout] | Callable[[float, float, float], float]
+    * combine_der_right: Callable[[x, y, dy], dout] | Callable[[float, float, float], float]
     """
     @_add_out_support
     def fn(x1, x2, /, out):
@@ -285,7 +287,12 @@ def _generate_two_argument_broadcasting_function(name, combine_val, combine_der)
             x2_val_idx = x2_flat[x2_elem_idx]
             out.val[idx] = combine_val(x1_val_idx, x2_val_idx)
             out_idx = _square_index_to_simple_index(idx, out.val.shape)
-            _combine_lil_rows(lambda dx, dy: combine_der(x1_val_idx, x2_val_idx, dx, dy), x1_der[x1_elem_idx], x2_der[x2_elem_idx], out.der.rows[out_idx], out.der.data[out_idx])
+            _combine_lil_rows(
+                lambda dx, dy: combine_der(x1_val_idx, x2_val_idx, dx, dy),
+                lambda dx: combine_der_left(x1_val_idx, x2_val_idx, dx),
+                lambda dy: combine_der_right(x1_val_idx, x2_val_idx, dy),
+                x1_der[x1_elem_idx], x2_der[x2_elem_idx],
+                out.der.rows[out_idx], out.der.data[out_idx])
         return cls(out.val, out.der)
 
     fn.__name__ = name
@@ -495,31 +502,59 @@ def positive(x, /, out):
 
 
 # Tested
-add = _generate_two_argument_broadcasting_function('add', lambda x, y: x + y, lambda _x, _y, dx, dy: dx + dy)
+add = _generate_two_argument_broadcasting_function('add',
+    lambda x, y: x + y,
+    lambda _x, _y, dx, dy: dx + dy,
+    lambda _x, _y, dx: dx,
+    lambda _x, _y, dy: dy
+)
 register(np.add)(add)
 
 # Tested
-subtract = _generate_two_argument_broadcasting_function('subtract', lambda x, y: x - y, lambda _x, _y, dx, dy: dx - dy)
+subtract = _generate_two_argument_broadcasting_function('subtract',
+    lambda x, y: x - y,
+    lambda _x, _y, dx, dy: dx - dy,
+    lambda _x, _y, dx: dx,
+    lambda _x, _y, dy: -dy,
+)
 register(np.subtract)(subtract)
 
 # Tested
-multiply = _generate_two_argument_broadcasting_function('multiply', lambda x, y: x * y, lambda x, y, dx, dy: x * dy + y * dx)
+multiply = _generate_two_argument_broadcasting_function('multiply',
+    lambda x, y: x * y,
+    lambda x, y, dx, dy: x * dy + y * dx,
+    lambda _x, y, dx: y * dx,
+    lambda x, _y, dy: x * dy,
+)
 register(np.multiply)(multiply)
 
 # Tested
-true_divide = _generate_two_argument_broadcasting_function('true_divide', lambda x, y: x / y, lambda x, y, dx, dy:  (y * dx - x * dy)/(y**2))
+true_divide = _generate_two_argument_broadcasting_function('true_divide',
+    lambda x, y: x / y,
+    lambda x, y, dx, dy:  (y * dx - x * dy)/(y**2),
+    lambda _x, y, dx:  (y * dx)/(y**2),
+    lambda x, y, dy:  (-x * dy)/(y**2),
+)
 register(np.true_divide)(true_divide)
 
 # Tested
-float_power = _generate_two_argument_broadcasting_function('float_power', lambda x, y: np.float_power(x, y), lambda x, y, dx, dy: (x**(y - 1)) * (y * dx + x * np.log(x) * dy))
+float_power = _generate_two_argument_broadcasting_function('float_power',
+    lambda x, y: np.float_power(x, y),
+    lambda x, y, dx, dy: (x**(y - 1)) * (y * dx + x * np.log(x) * dy),
+    lambda x, y, dx: (x**(y - 1)) * y * dx,
+    lambda x, y, dy: (x**y) * np.log(x) * dy,
+)
 register(np.float_power)(float_power)
 
 # Tested
-power = _generate_two_argument_broadcasting_function('power', lambda x, y: np.power(x,y), lambda x, y, dx, dy: (x**(y - 1)) * (y * dx + x * np.log(x) * dy))
+power = _generate_two_argument_broadcasting_function('power',
+    lambda x, y: np.power(x,y),
+    lambda x, y, dx, dy: (x**(y - 1)) * (y * dx + x * np.log(x) * dy),
+    lambda x, y, dx: (x**(y - 1)) * y * dx,
+    lambda x, y, dy: (x**y) * np.log(x) * dy,
+)
 register(np.power)(power)
 
-# Partially Tested
-# TODO: Add support for broadcasting.
 
 def _matmul_internal_gradient_compute_valder_valder(i, k, x1, x2, grad_matrix, entry_index):
     """
@@ -563,7 +598,8 @@ def _matmul_internal_gradient_compute_ndarray_valder(i, k, x1, x2, grad_matrix, 
         for grad_idx, x2_der_value in zip(x2.der.rows[x2_der_idx], x2.der.data[x2_der_idx]):
             grad_matrix[entry_index, grad_idx] += x1_ij * x2_der_value
 
-
+# Partially Tested
+# TODO: Add support for broadcasting.
 @register(np.matmul)
 @_add_out_support
 def matmul(x1, x2, /, out):
