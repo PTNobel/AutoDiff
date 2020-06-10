@@ -96,7 +96,8 @@ class PairedIterator:
 _empty_lil = scipy.sparse.lil_matrix([[]])
 def _combine_lil_rows(combine_func, x, y, out_idx, out_data):
     paired_iter = PairedIterator(zip(x.rows[0], x.data[0]), zip(y.rows[0], y.data[0]))
-
+    out_idx.clear()
+    out_data.clear()
     try:
         while True:
             if paired_iter.left_value[0] == paired_iter.right_value[0]:
