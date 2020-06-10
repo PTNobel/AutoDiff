@@ -315,7 +315,31 @@ class TestSingleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
         u = np.array([[1.0]])
         self._test_helper(lambda x: f(x, u), x, df_dx)
 
+    def test_mutating_in_place(self):
+        def f(x):
+            out = np.zeros((3, 1))
+            out[1, 0] -= x[0, 0]
+            out[2, 0] += x[1]
+            return out
 
+        x = np.array([[5.], [2.]])
+        df_dx = np.array([[0., 0.],
+                          [-1., 0.],
+                          [0., 1.]])
+
+        self._test_helper(f, x, df_dx)
+
+    def test_mutating_in_place_same_row(self):
+        def f(x):
+            out = np.zeros((1, 1))
+            out[0, 0] += x[0, 0]
+            out[0, 0] += x[1, 0]
+            return out
+
+        x = np.array([[5.], [2.]])
+        df_dx = np.array([[1., 1.]])
+
+        self._test_helper(f, x, df_dx)
 
 
 class TestMultipleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
@@ -499,6 +523,7 @@ class TestMultipleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
                           [0., np.log(2) * 2**4]])
 
         self._test_helper(f, x, u, df_dx, df_du)
+
 
 class TestArbitraryShapeSparseAutoDiff(SparseAutoDiffUnitTesting):
     def _test_helper(self, f, x, df_dx, debug=False):
