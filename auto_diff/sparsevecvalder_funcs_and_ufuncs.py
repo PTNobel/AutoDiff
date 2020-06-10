@@ -293,13 +293,19 @@ def _generate_two_argument_broadcasting_function(name, combine_val, combine_der)
 
 @register(np.transpose)
 def transpose(a, axes=None):
-    raise NotImplementedError("Yet to implement transpose on SparseVecValDer")
+
     assert isinstance(a, cls)
     val = np.transpose(a.val, axes)
-    dims = len(val.shape)
-    if axes is None:
-        axes = reversed(range(dims))
-    der = np.transpose(a.der, (*axes, *range(dims, 2 * dims)))
+
+    if len([dim for dim in a.shape if dim > 1]) <= 1:
+        # Then np.transpose doesn't change any thing I hope?
+        return cls(val, scipy.sparse.lil_matrix(a.der))
+
+    val_idx = np.arange(np.size(a.val)).reshape(a.val.shape)
+
+    val_idx_shuffle = np.transpose(val_idx, axes)
+    
+    der = a.der[val_idx_shuffle.flat]
     return cls(val, der)
 
 
@@ -500,7 +506,7 @@ multiply = _generate_two_argument_broadcasting_function('multiply', lambda x, y:
 register(np.multiply)(multiply)
 
 # Tested
-true_divide = _generate_two_argument_broadcasting_function('true_divide', lambda x, y: x / y, lambda x, y, dx, dy:  (y * dx - x * dy)(y**2))
+true_divide = _generate_two_argument_broadcasting_function('true_divide', lambda x, y: x / y, lambda x, y, dx, dy:  (y * dx - x * dy)/(y**2))
 register(np.true_divide)(true_divide)
 
 # Tested
