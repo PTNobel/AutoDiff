@@ -42,36 +42,66 @@ class ScalarAsArrayWrapper:
             return NotImplemented
 
 
+class PairedIterator:
+    sentinel = object()
+
+    __slots__ = 'left_iter', 'right_iter', '_left_cache'
+
+    def __init__(self, left_iter, right_iter):
+        self.left_iter = left_iter
+        self.right_iter = right_iter
+        self._left_cache = PairedIterator.sentinel
+
+    def poll_both(self):
+        left_out = next(self.left_iter)
+
+        try:
+            right_out = next(self.right_iter)
+        except StopIteration:
+            self._left_cache = left_out
+            raise
+
+        return left_out, right_out
+
+
+    def poll_left(self):
+        if self._left_cache is PairedIterator.sentinel:
+            return next(self.left_iter)
+        else:
+            left_out = self._left_cache
+            self._left_cache = PairedIterator.sentinel
+            return left_out
+    
+    def poll_right(self):
+        return next(self.right_iter)
+
 _empty_lil = scipy.sparse.lil_matrix([[]])
 def _combine_lil_rows(combine_func, x, y, out_idx, out_data):
-    x_iter = zip(x.rows[0], x.data[0])
-    y_iter = zip(y.rows[0], y.data[0])
+    paired_iter = PairedIterator(zip(x.rows[0], x.data[0]), zip(y.rows[0], y.data[0]))
 
     try:
-        x_idx, x_val = next(x_iter)
-        y_idx, y_val = next(y_iter)
+        (x_idx, x_val), (y_idx, y_val) = paired_iter.poll_both()
 
         while True:
             if x_idx == y_idx:
                 out_idx.append(x_idx)
                 out_data.append(combine_func(x_val, y_val))
-                x_idx, x_val = next(x_iter)
-                y_idx, y_val = next(y_iter)
+                (x_idx, x_val), (y_idx, y_val) = paired_iter.poll_both()
             elif x_idx < y_idx:
                 out_idx.append(x_idx)
                 out_data.append(combine_func(x_val, 0.0))
-                x_idx, x_val = next(x_iter)
+                x_idx, x_val = paired_iter.poll_left()
             elif x_idx > y_idx:
                 out_idx.append(y_idx)
                 out_data.append(combine_func(0.0, y_val))
-                y_idx, y_val = next(y_iter)
+                y_idx, y_val = paired_iter.poll_right()
     except StopIteration:
         pass
 
     try:
         # consume x_iter
         while True:
-            x_idx, x_val = next(x_iter)
+            x_idx, x_val = paired_iter.poll_left()
             out_idx.append(x_idx)
             out_data.append(combine_func(x_val, 0.0))
     except StopIteration:
@@ -80,7 +110,7 @@ def _combine_lil_rows(combine_func, x, y, out_idx, out_data):
     try:
         # consume y_iter
         while True:
-            y_idx, y_val = next(y_iter)
+            y_idx, y_val = paired_iter.poll_right()
             out_idx.append(y_idx)
             out_data.append(combine_func(0.0, y_val))
     except StopIteration:
@@ -467,50 +497,94 @@ register(np.power)(power)
 
 # Partially Tested
 # TODO: Add support for broadcasting.
+
+def _matmul_internal_gradient_compute_valder_valder(i, k, x1, x2, grad_matrix, entry_index):
+    """
+        x1: SparseVecValDer
+        x2: SparseVecValDer
+    """
+    for j in range(x1.shape[1]):
+        x2_der_idx = _square_index_to_simple_index((j, k), x2.val.shape)
+        x1_der_idx = _square_index_to_simple_index((i, j), x1.val.shape)
+        x1_ij = x1.val[i, j] 
+        x2_jk = x2.val[j, k]
+        for grad_idx, x2_der_value in zip(x2.der.rows[x2_der_idx], x2.der.data[x2_der_idx]):
+            grad_matrix[entry_index, grad_idx] += x1_ij * x2_der_value
+
+        for grad_idx, x1_der_value in zip(x1.der.rows[x1_der_idx], x1.der.data[x1_der_idx]):
+            grad_matrix[entry_index, grad_idx] += x1_der_value * x2_jk
+
+
+def _matmul_internal_gradient_compute_valder_ndarray(i, k, x1, x2, grad_matrix, entry_index):
+    """
+        x1: SparseVecValDer
+        x2: np.ndarray
+    """
+    for j in range(x1.shape[1]):
+        x1_der_idx = _square_index_to_simple_index((i, j), x1.val.shape)
+        x2_jk = x2[j, k]
+
+        for grad_idx, x1_der_value in zip(x1.der.rows[x1_der_idx], x1.der.data[x1_der_idx]):
+            grad_matrix[entry_index, grad_idx] += x1_der_value * x2_jk
+
+
+def _matmul_internal_gradient_compute_ndarray_valder(i, k, x1, x2, grad_matrix, entry_index):
+    """
+        x1: np.ndarray
+        x2: SparseVecValDer
+    """
+    for j in range(x1.shape[1]):
+        x2_der_idx = _square_index_to_simple_index((j, k), x2.val.shape)
+        x1_ij = x1[i, j] 
+
+        for grad_idx, x2_der_value in zip(x2.der.rows[x2_der_idx], x2.der.data[x2_der_idx]):
+            grad_matrix[entry_index, grad_idx] += x1_ij * x2_der_value
+
+
 @register(np.matmul)
 @_add_out_support
 def matmul(x1, x2, /, out):
-    raise NotImplementedError("matmul has not been built yet")
-
+    # C/Cython candidate
     if isinstance(x1, cls) and isinstance(x2, cls):
         val = np.matmul(x1.val, x2.val, out=out.val)
-        # Find a way to write der as numpy primitives.
-        # C/Cython candidate
+
         if out.der is None:
-            der = np.ndarray((*val.shape, *x1.der.shape[-2:]))
+            der = scipy.sparse.lil_matrix((np.size(val), x1.der.size[1]))
         else:
             der = out.der
+
         for i, k in _ndindex(val.shape):
-            der[i, k] = sum(
-                x1.val[i, j] * x2.der[j, k] + x1.der[i, j] * x2.val[j, k]
-                for j in range(x1.shape[1]))
+            ik_comb = _square_index_to_simple_index((i, k), val.shape)
+            _matmul_internal_gradient_compute_valder_valder(i, k, x1, x2, der, ik_comb)
+
         return cls(val, der)
 
     elif isinstance(x1, cls):
         val = np.matmul(x1.val, x2, out=out.val)
-        # Find a way to write der as numpy primitives.
-        # C/Cython candidate
         if out.der is None:
-            der = np.ndarray((*val.shape, *x1.der.shape[-2:]))
+            der = scipy.sparse.lil_matrix((np.size(val), x1.der.shape[1]))
         else:
             der = out.der
+
         for i, k in _ndindex(val.shape):
-            der[i, k] = sum(x1.der[i, j] * x2[j, k]
-                            for j in range(x1.shape[1]))
+            ik_comb = _square_index_to_simple_index((i, k), val.shape)
+            _matmul_internal_gradient_compute_valder_ndarray(i, k, x1, x2, der, ik_comb)
+
         return cls(val, der)
 
     elif isinstance(x2, cls):
         val = np.matmul(x1, x2.val, out=out.val)
-        # Find a way to write der as numpy primitives.
-        # C/Cython candidate
         if out.der is None:
-            der = np.ndarray((*val.shape, *x2.der.shape[-2:]))
+            der = scipy.sparse.lil_matrix((np.size(val), x2.der.shape[1]))
         else:
             der = out.der
+
         for i, k in _ndindex(val.shape):
-            der[i, k] = sum(x1[i, j] * x2.der[j, k]
-                            for j in range(x1.shape[1]))
+            ik_comb = _square_index_to_simple_index((i, k), val.shape)
+            _matmul_internal_gradient_compute_ndarray_valder(i, k, x1, x2, der, ik_comb)
+
         return cls(val, der)
+
     else:
         raise RuntimeError("This should not be occuring.")
 
