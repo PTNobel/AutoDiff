@@ -2,7 +2,7 @@
 An automatic differentiation library for Python+NumPy
 
 ## How To Use
-There are four public elements of the API:
+There are five public elements of the API:
 
  * `AutoDiff` is a context manager and must be entered with a with statement.
 The `__enter__` method returns a new version of x that must be used to instead of the x passed as a parameter to the `AutoDiff` constructor.
@@ -11,11 +11,19 @@ The `__enter__` method returns a new version of x that must be used to instead o
  called in an `AutoDiff` context, extract the value, Jacobian, or both from a
  dependent variable.
 
+ * `get_value_and_jacobians`, if multiple vectors are passed in as arguments to `AutoDiff`, this method returns a tuple of Jacobians wrt to the different variables.
+
 If you are using `get_value_and_jacobian`, x must be a 2D column vector, and
 the value you must be parsing for the derivative must also be a 2D column
 vector. In most other cases, how to convert to a Jacobian Matrix is
 non-obvious. If you wish to deal with those cases see the paragraph after the
 example.
+
+`auto_diff` also supports using sparse matrices instead of `ndarray`s to store the Jacobians.
+Simple use the `SparseAutoDiff` context manager instead of `AutoDiff`.
+Also if you use `SparseAutoDiff`, you need to verify that your code and none of non-NumPy dependencies use the `np.ndarray` constructor for a floating point vector.
+If using `SparseAutoDiff`, `get_value_and_jacobian`, `jacobian`, and `get_value_and_jacobians` return `scipy.sparse.lil_matrix`es instead of `ndarray`s.
+
 
 ### Example
 ```python
@@ -23,7 +31,7 @@ import auto_diff
 import numpy as np
 
 # Define a function f
-# f can have other constant arguments, if they are constant wrt x
+# f can have other arguments, if they are constant wrt x
 # Define the input vector, x
 
 with auto_diff.AutoDiff(x) as x:
@@ -31,6 +39,28 @@ with auto_diff.AutoDiff(x) as x:
     y, Jf = auto_diff.get_value_and_jacobian(f_eval)
 
 # y is the value of f(x, u) and Jf is the Jacobian of f with respect to x.
+```
+
+If you need both the Jacobian wrt to x and u,
+
+```python
+with auto_diff.AutoDiff(x, u) as (x, u):
+    f_eval = f(x, u)
+    y, (Jfx, Jfu) = auto_diff.get_value_and_jacobians(f_eval)
+
+# y is the value of f(x, u), Jfx is the Jacobian of f with respect to x, and
+# Jfu is the Jacobian of f with respect to u.
+```
+
+Finally, if `f` and `x` are very high-dimensional, then we can use `SparseAutoDiff` to save memory.
+```python
+with auto_diff.SparseAutoDiff(x, u) as (x, u):
+    f_eval = f(x, u)
+    y, (Jfx, Jfu) = auto_diff.get_value_and_jacobians(f_eval)
+
+# y is the value of f(x, u), Jfx is the Jacobian of f with respect to x, and
+# Jfu is the Jacobian of f with respect to u.
+# Jfx and Jfu are instances of scipy.sparse.lil_matrix.
 ```
 
 We can also differentiate functions from arbitrarily shaped numpy arrays to
