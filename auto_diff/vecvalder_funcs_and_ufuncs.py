@@ -275,9 +275,9 @@ def positive(x, /, out):
 @_add_out_support
 def add(x1, x2, /, out):
     broadcast_obj = np.broadcast(x1, x2)
-    idx_iterator = _ndindex(broadcast_obj.shape)
     if out.val is None:
         out = modded_np.empty(broadcast_obj.shape)
+    idx_iterator = _ndindex(out.val.shape)
  
     if isinstance(x1, cls) and isinstance(x2, cls):
         for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
@@ -304,9 +304,9 @@ def add(x1, x2, /, out):
 @_add_out_support
 def subtract(x1, x2, /, out):
     broadcast_obj = np.broadcast(x1, x2)
-    idx_iterator = _ndindex(broadcast_obj.shape)
     if out.val is None:
         out = modded_np.empty(broadcast_obj.shape)
+    idx_iterator = _ndindex(out.val.shape)
  
     if isinstance(x1, cls) and isinstance(x2, cls):
         for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
@@ -334,9 +334,9 @@ def subtract(x1, x2, /, out):
 @_add_out_support
 def multiply(x1, x2, /, out):
     broadcast_obj = np.broadcast(x1, x2)
-    idx_iterator = _ndindex(broadcast_obj.shape)
     if out.val is None:
         out = modded_np.empty(broadcast_obj.shape)
+    idx_iterator = _ndindex(out.val.shape)
  
     if isinstance(x1, cls) and isinstance(x2, cls):
         for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
@@ -365,9 +365,9 @@ def multiply(x1, x2, /, out):
 @_add_out_support
 def true_divide(x1, x2, /, out):
     broadcast_obj = np.broadcast(x1, x2)
-    idx_iterator = _ndindex(broadcast_obj.shape)
     if out.val is None:
         out = modded_np.empty(broadcast_obj.shape)
+    idx_iterator = _ndindex(out.val.shape)
  
     if isinstance(x1, cls) and isinstance(x2, cls):
         for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
@@ -396,9 +396,9 @@ def true_divide(x1, x2, /, out):
 @_add_out_support
 def float_power(x1, x2, /, out):
     broadcast_obj = np.broadcast(x1, x2)
-    idx_iterator = _ndindex(broadcast_obj.shape)
     if out.val is None:
         out = modded_np.empty(broadcast_obj.shape)
+    idx_iterator = _ndindex(out.val.shape)
  
     if isinstance(x1, cls) and isinstance(x2, cls):
         for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
@@ -426,9 +426,9 @@ def float_power(x1, x2, /, out):
 @_add_out_support
 def power(x1, x2, /, out):
     broadcast_obj = np.broadcast(x1, x2)
-    idx_iterator = _ndindex(broadcast_obj.shape)
     if out.val is None:
         out = modded_np.empty(broadcast_obj.shape)
+    idx_iterator = _ndindex(out.val.shape)
  
     if isinstance(x1, cls) and isinstance(x2, cls):
         for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):

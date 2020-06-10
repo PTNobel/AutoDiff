@@ -260,9 +260,10 @@ def _generate_two_argument_broadcasting_function(name, combine_val, combine_der,
         x2_index = np.arange(np.size(x2)).reshape(x2.shape)
 
         broadcast_obj = np.broadcast(x1_index, x2_index)
-        idx_iterator = _ndindex(broadcast_obj.shape)
         if out.val is None:
             out = modded_np.empty(broadcast_obj.shape)
+
+        idx_iterator = _ndindex(out.val.shape)
 
         if isinstance(x1, cls) and isinstance(x2, cls):
             x1_flat = x1.val.flat
@@ -611,6 +612,9 @@ def matmul(x1, x2, /, out):
             der = scipy.sparse.lil_matrix((np.size(val), x1.der.shape[1]))
         else:
             der = out.der
+            for idx, der_vals in zip(der.rows, der.data):
+                idx.clear()
+                der_vals.clear()
 
         for i, k in _ndindex(val.shape):
             ik_comb = _square_index_to_simple_index((i, k), val.shape)
