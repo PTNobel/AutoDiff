@@ -45,74 +45,90 @@ class ScalarAsArrayWrapper:
 class PairedIterator:
     sentinel = object()
 
-    __slots__ = 'left_iter', 'right_iter', '_left_cache'
+    __slots__ = 'left_iter', 'right_iter', '_left_value', '_right_value'
 
     def __init__(self, left_iter, right_iter):
         self.left_iter = left_iter
         self.right_iter = right_iter
-        self._left_cache = PairedIterator.sentinel
+        self._left_value = PairedIterator.sentinel
+        self._right_value = PairedIterator.sentinel
 
-    def poll_both(self):
-        left_out = next(self.left_iter)
-
+    def advance_both(self):
         try:
-            right_out = next(self.right_iter)
+            self.advance_left()
+        finally:
+            self.advance_right()
+
+    @property
+    def left_value(self):
+        if self._left_value is PairedIterator.sentinel:
+            self.advance_left()
+
+        if self._left_value is PairedIterator.sentinel:
+            raise StopIteration
+
+        return self._left_value
+
+    @property
+    def right_value(self):
+        if self._right_value is PairedIterator.sentinel:
+            self.advance_right()
+
+        if self._right_value is PairedIterator.sentinel:
+            raise StopIteration
+
+        return self._right_value
+
+    def advance_left(self):
+        try:
+            self._left_value = next(self.left_iter)
         except StopIteration:
-            self._left_cache = left_out
+            self._left_value = PairedIterator.sentinel
             raise
 
-        return left_out, right_out
-
-
-    def poll_left(self):
-        if self._left_cache is PairedIterator.sentinel:
-            return next(self.left_iter)
-        else:
-            left_out = self._left_cache
-            self._left_cache = PairedIterator.sentinel
-            return left_out
-    
-    def poll_right(self):
-        return next(self.right_iter)
+    def advance_right(self):
+        try:
+            self._right_value = next(self.right_iter)
+        except StopIteration:
+            self._right_value = PairedIterator.sentinel
+            raise
 
 _empty_lil = scipy.sparse.lil_matrix([[]])
 def _combine_lil_rows(combine_func, x, y, out_idx, out_data):
     paired_iter = PairedIterator(zip(x.rows[0], x.data[0]), zip(y.rows[0], y.data[0]))
 
     try:
-        (x_idx, x_val), (y_idx, y_val) = paired_iter.poll_both()
-
         while True:
-            if x_idx == y_idx:
-                out_idx.append(x_idx)
-                out_data.append(combine_func(x_val, y_val))
-                (x_idx, x_val), (y_idx, y_val) = paired_iter.poll_both()
-            elif x_idx < y_idx:
-                out_idx.append(x_idx)
-                out_data.append(combine_func(x_val, 0.0))
-                x_idx, x_val = paired_iter.poll_left()
-            elif x_idx > y_idx:
-                out_idx.append(y_idx)
-                out_data.append(combine_func(0.0, y_val))
-                y_idx, y_val = paired_iter.poll_right()
+            if paired_iter.left_value[0] == paired_iter.right_value[0]:
+                out_idx.append(paired_iter.left_value[0])
+                out_data.append(combine_func(paired_iter.left_value[1], paired_iter.right_value[1]))
+                paired_iter.advance_both()
+            elif paired_iter.left_value[0] < paired_iter.right_value[0]:
+                out_idx.append(paired_iter.left_value[0])
+                out_data.append(combine_func(paired_iter.left_value[1], 0.0))
+                paired_iter.advance_left()
+            elif paired_iter.left_value[0] > paired_iter.right_value[0]:
+                out_idx.append(paired_iter.right_value[0])
+                out_data.append(combine_func(paired_iter.right_value[1], 0.0))
+                paired_iter.advance_right()
     except StopIteration:
         pass
 
     try:
-        # consume x_iter
+        # consume left
         while True:
-            x_idx, x_val = paired_iter.poll_left()
-            out_idx.append(x_idx)
-            out_data.append(combine_func(x_val, 0.0))
+            out_idx.append(paired_iter.left_value[0])
+            out_data.append(combine_func(paired_iter.left_value[1], 0.0))
+            paired_iter.advance_left()
     except StopIteration:
         pass
 
     try:
-        # consume y_iter
+        # consume right
         while True:
-            y_idx, y_val = paired_iter.poll_right()
-            out_idx.append(y_idx)
-            out_data.append(combine_func(0.0, y_val))
+            out_idx.append(paired_iter.right_value[0])
+            out_data.append(combine_func(0.0, paired_iter.right_value[1]))
+            paired_iter.advance_right()
     except StopIteration:
         pass
 
