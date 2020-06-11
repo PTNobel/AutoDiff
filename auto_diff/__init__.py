@@ -181,3 +181,12 @@ def jacobian(x):
     i, j, k, n = x.der.shape
     assert j == 1 == n
     return x.der.reshape((i, k))
+
+
+__all__ = [
+    'AutoDiff',
+    'SparseAutoDiff',
+    'get_value_and_jacobian',
+    'get_value_and_jacobians',
+    'jacobian',
+]
