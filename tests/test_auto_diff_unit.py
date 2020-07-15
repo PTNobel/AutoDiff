@@ -9,13 +9,14 @@ class AutoDiffUnitTesting(unittest.TestCase):
 
 
 class TestSingleVariableAutoDiff(AutoDiffUnitTesting):
-    def _test_helper(self, f, x, df_dx, debug=False):
+    def _test_helper(self, f, x, df_dx, debug=False, test_complex=False):
         if debug:
             breakpoint()
 
         input_x = x
+        input_df_dx = df_dx
         f_x = f(input_x)
-        with auto_diff.AutoDiff(input_x) as x:
+        with auto_diff.AutoDiff(input_x, complex=test_complex) as x:
             y, Jf = auto_diff.get_value_and_jacobian(f(x))
 
         self._assertAllClose(y, f_x)
@@ -28,25 +29,32 @@ class TestSingleVariableAutoDiff(AutoDiffUnitTesting):
 
         df_dx = df_dx @ A
 
-        with auto_diff.AutoDiff(x) as x:
+        with auto_diff.AutoDiff(x, complex=test_complex) as x:
             y, Jf = auto_diff.get_value_and_jacobian(f(A @ x + b))
     
         self._assertAllClose(y, f_x)
         self._assertAllClose(Jf, df_dx)
 
-    def _test_out(self, f, x, df_dx, debug=False):
+        if not test_complex:
+            self._test_helper(f, input_x, input_df_dx, debug, True)
+
+    def _test_out(self, f, x, df_dx, debug=False, test_complex=False):
         if debug:
             breakpoint()
         input_x = x
+        input_df_dx = df_dx
         f_x = f(input_x)
 
-        with auto_diff.AutoDiff(input_x) as x:
+        with auto_diff.AutoDiff(input_x, complex=test_complex) as x:
             out_dest = np.ndarray(f_x.shape)
             f(x, out=out_dest)
             y, Jf = auto_diff.get_value_and_jacobian(out_dest)
 
         self._assertAllClose(f_x, y)
         self._assertAllClose(Jf, df_dx)
+
+        if not test_complex:
+            self._test_out(f, input_x, input_df_dx, debug, True)
 
     def test_add_with_out(self):
         def f(x):

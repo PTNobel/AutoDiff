@@ -3,6 +3,7 @@ from .vecvalder import VecValDer
 from . import true_np
 
 
+_der_dtype = None
 _active_auto_diffs = []
 
 # FYI *_like can be handled as functions on their parameters, but I decided not
@@ -62,19 +63,28 @@ class WithTrueNumpy:
 
 # TODO: Add vstack hstack stack dstack concatenate vsplit block
 class AutoDiff:
-    def __init__(self, *vecs):
+    def __init__(self, *vecs, complex=None):
         self.vecs = vecs
         self.x = np.vstack(vecs)
+        self.complex = complex or (complex is None and np.iscomplexobj(self.x))
 
     def __enter__(self):
+        global _der_dtype
+
         _active_auto_diffs.append(self)
         new_np = {fn_name: getattr(self, fn_name)
                   for fn_name in _list_of_masked_functions}
 
         self.old_nps = _swap_numpy_methods(new_np)
 
+        self._old_der_dtype = _der_dtype
+        if self.complex:
+            _der_dtype = np.complex128
+        else:
+            _der_dtype = np.float64
+
         val = np.asarray(self.x)
-        der = true_np.zeros((*val.shape, *val.shape))
+        der = true_np.zeros((*val.shape, *val.shape), dtype=_der_dtype)
         for i in np.ndindex(val.shape):
             der[(*i, *i)] = 1.0
 
@@ -92,11 +102,13 @@ class AutoDiff:
             return out
 
     def __exit__(self, type, value, traceback):
+        global _der_dtype
+        _der_dtype = self._old_der_dtype
         _active_auto_diffs.remove(self)
         _swap_numpy_methods(self.old_nps)
 
     def _build_vec_val_der(self, val):
-        der = true_np.zeros((*val.shape, *self.x.shape))
+        der = true_np.zeros((*val.shape, *self.x.shape), dtype=_der_dtype)
         return VecValDer(val, der)
 
     def zeros(self, shape):
@@ -118,10 +130,10 @@ class AutoDiff:
                     or hasattr(item, '__array__'):
                 val_rows.append(item)
                 der_rows.append(true_np.zeros(
-                    (*item.shape, *self.x.shape)))
+                    (*item.shape, *self.x.shape), dtype=_der_dtype))
             elif np.isscalar(item):
                 val_rows.append(item)
-                der_rows.append(true_np.zeros(self.x.shape))
+                der_rows.append(true_np.zeros(self.x.shape, dtype=_der_dtype))
             else:
                 sub_val_rows, sub_der_rows = self._parse_list_of_items(item)
                 val_rows.append(sub_val_rows)

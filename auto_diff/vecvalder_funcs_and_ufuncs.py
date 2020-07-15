@@ -1,6 +1,7 @@
 from .vecvalder import register, VecValDer
 import warnings
 from . import true_np as np
+from . import numpy_masking
 import numpy as modded_np
 
 cls = VecValDer
@@ -57,7 +58,7 @@ def _chain_rule(f_x, dx, out=None):
     \nabla f(g(x)) = f'(g(x)) \nabla g(x)
     """
     if out is None:
-        out = np.ndarray(dx.shape)  # Uninitialized memory is fine because
+        out = np.ndarray(dx.shape, dtype=numpy_masking._der_dtype)  # Uninitialized memory is fine because
     # we're about to overwrite each element. If we do compression of the for
     # loop in the future be sure to switch to np.zeros.
     for index, y in np.ndenumerate(f_x):
@@ -461,7 +462,7 @@ def matmul(x1, x2, /, out):
         # Find a way to write der as numpy primitives.
         # C/Cython candidate
         if out.der is None:
-            der = np.ndarray((*val.shape, *x1.der.shape[-2:]))
+            der = np.ndarray((*val.shape, *x1.der.shape[-2:]), dtype=numpy_masking._der_dtype)
         else:
             der = out.der
         for i, k in _ndindex(val.shape):
@@ -475,7 +476,7 @@ def matmul(x1, x2, /, out):
         # Find a way to write der as numpy primitives.
         # C/Cython candidate
         if out.der is None:
-            der = np.ndarray((*val.shape, *x1.der.shape[-2:]))
+            der = np.ndarray((*val.shape, *x1.der.shape[-2:]), dtype=numpy_masking._der_dtype)
         else:
             der = out.der
         for i, k in _ndindex(val.shape):
@@ -488,7 +489,7 @@ def matmul(x1, x2, /, out):
         # Find a way to write der as numpy primitives.
         # C/Cython candidate
         if out.der is None:
-            der = np.ndarray((*val.shape, *x2.der.shape[-2:]))
+            der = np.ndarray((*val.shape, *x2.der.shape[-2:]), dtype=numpy_masking._der_dtype)
         else:
             der = out.der
         for i, k in _ndindex(val.shape):
