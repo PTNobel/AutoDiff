@@ -112,11 +112,11 @@ class AutoDiff:
         return VecValDer(val, der)
 
     def zeros(self, shape):
-        val = true_np.zeros(shape)
+        val = true_np.zeros(shape, dtype=_der_dtype)
         return self._build_vec_val_der(val)
 
     def ndarray(self, shape):
-        val = true_np.ndarray(shape)
+        val = true_np.ndarray(shape, dtype=_der_dtype)
         return self._build_vec_val_der(val)
 
     def _parse_list_of_items(self, obj):
@@ -153,20 +153,20 @@ class AutoDiff:
             return self._build_vec_val_der(val)
         else:
             val_rows, der_rows = self._parse_list_of_items(obj)
-            val = true_np.array(val_rows)
-            der = true_np.array(der_rows)
+            val = true_np.array(val_rows, dtype=_der_dtype)
+            der = true_np.array(der_rows, dtype=_der_dtype)
             return VecValDer(val, der)
 
     def eye(self, N, M=None, k=0):
-        val = true_np.eye(N, M, k)
+        val = true_np.eye(N, M, k, dtype=_der_dtype)
         return self._build_vec_val_der(val)
 
     def identity(self, n):
-        val = true_np.identity(n)
+        val = true_np.identity(n, dtype=_der_dtype)
         return self._build_vec_val_der(val)
 
     def ones(self, shape):
-        val = true_np.ones(shape)
+        val = true_np.ones(shape, dtype=_der_dtype)
         return self._build_vec_val_der(val)
 
     def ones_like(self, a):
@@ -194,11 +194,11 @@ class AutoDiff:
         return self._build_vec_val_der(val)
 
     def full(self, shape, fill_value):
-        val = true_np.full(shape, fill_value)
+        val = true_np.full(shape, fill_value, dtype=_der_dtype)
         return self._build_vec_val_der(val)
 
     def empty(self, shape):
-        val = true_np.empty(shape)
+        val = true_np.empty(shape, dtype=_der_dtype)
         return self._build_vec_val_der(val)
 
     def full_like(self, a, fill_value):
