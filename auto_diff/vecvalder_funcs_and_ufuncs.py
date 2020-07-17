@@ -114,6 +114,9 @@ def absolute(x, /, out):
     if (small_mask).any():
         warnings.warn('abs of a near-zero number, derivative is ill-defined')
         der_mask[small_mask] = 0
+    elif np.iscomplexobj(x.der):
+        warnings.warn('abs of complex numbers, derivative is ill-defined.\n'
+                      ' Assuming that x.imag == 0 and differentiating along the real line.')
 
     der = _chain_rule(der_mask, x.der, out=out.der)
     return cls(val, der)
@@ -531,3 +534,7 @@ register(np.not_equal)(not_equal)
 @register(np.isfinite)
 def isfinite(x):
     return np.isfinite(x.val)
+
+@register(np.iscomplexobj)
+def iscomplexobj(x):
+    return np.iscomplexobj(x.val)
