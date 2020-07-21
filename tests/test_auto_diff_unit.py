@@ -21,7 +21,7 @@ class TestSingleVariableAutoDiff(AutoDiffUnitTesting):
 
         self._assertAllClose(y, f_x)
         self._assertAllClose(Jf, df_dx)
-    
+
         # Some bugs only appeared with rectangular Jacobians.
         A = np.random.rand(input_x.shape[0], 3 * input_x.shape[0])
         b = np.random.rand(input_x.shape[0], 1)
@@ -31,7 +31,7 @@ class TestSingleVariableAutoDiff(AutoDiffUnitTesting):
 
         with auto_diff.AutoDiff(x, complex=test_complex) as x:
             y, Jf = auto_diff.get_value_and_jacobian(f(A @ x + b))
-    
+
         self._assertAllClose(y, f_x)
         self._assertAllClose(Jf, df_dx)
 
@@ -79,7 +79,7 @@ class TestSingleVariableAutoDiff(AutoDiffUnitTesting):
                         [0.0, 2 + 4 * 1./4., 0.0],
                         [0.0, 0.0, 3 + 9 * 1./6.]])
         self._test_helper(f, x, df_dx)
-    
+
     def test_abs(self):
         f = np.abs
         x = np.array([[2.], [-2.], [0.0]])
@@ -100,22 +100,22 @@ class TestSingleVariableAutoDiff(AutoDiffUnitTesting):
         # df_dx = np.array([[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, 1.0]])
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
-        
+
     def test_sin(self):
         f = np.sin
         x = np.array([[np.pi], [-np.pi/2], [np.pi/4]])
         df_dx = np.array([[-1.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0, 0, np.sqrt(2) / 2]])
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
-        
-       
+
+
     def test_cos(self):
         f = np.cos
         x = np.array([[np.pi], [-np.pi/2], [np.pi/4]])
         df_dx = np.array([[0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0, 0, -np.sqrt(2) / 2]])
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
-        
+
     def test_tan(self):
         f = np.tan
         x = np.array([[np.pi], [-np.pi/3], [np.pi/4]])
@@ -173,7 +173,7 @@ class TestSingleVariableAutoDiff(AutoDiffUnitTesting):
                         [0, 0, 2 / np.sqrt(3)]])
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
-    
+
     def test_arccos(self):
         f = np.arccos
         x = np.array([[0], [np.sqrt(2)/2], [1/2]])
@@ -182,7 +182,7 @@ class TestSingleVariableAutoDiff(AutoDiffUnitTesting):
                         [0, 0, -2 / np.sqrt(3)]])
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
-        
+
     def test_arctan(self):
         f = np.arctan
         x = np.array([[-1.0], [99999], [1.0]])
@@ -191,49 +191,49 @@ class TestSingleVariableAutoDiff(AutoDiffUnitTesting):
                         [0, 0, 1/2]])
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
-        
+
     def test_log(self):
         f = np.log
         x = np.array([[1.0], [0.5], [2.5]])
         df_dx = np.diag([1.0, 2, .4])
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
-        
+
     def test_log2(self):
         f = np.log2
         x = np.array([[1.0], [0.5], [2.5]])
         df_dx = np.diag([1.0, 2, .4]) / np.log(2)
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
-        
+
     def test_log10(self):
         f = np.log10
         x = np.array([[1.0], [0.5], [2.5]])
         df_dx = np.diag([1.0, 2, .4]) / np.log(10)
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
-        
+
     def test_log1p(self):
         f = np.log1p
         x = np.array([[1.0], [-0.5], [1.5]])
         df_dx = np.diag([.5, 2, .4])
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
-        
+
     def test_negative(self):
         f = np.negative
         x = np.array([[1.0], [-0.5], [1.5]])
         df_dx = -np.eye(3)
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
-        
+
     def test_positive(self):
         f = np.positive
         x = np.array([[1.0], [-0.5], [1.5]])
         df_dx = np.eye(3)
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
-        
+
     def test_decomposing_x(self):
         def f(x):
             x_1, x_2, x_3 = x
@@ -255,7 +255,7 @@ class TestSingleVariableAutoDiff(AutoDiffUnitTesting):
             x_1, x_2, x_3 = x
             return np.array([x_1 * x_2 - 2. * x_3 - x_1 * 3.,
                             x_2 / x_3 - x_2 / 2. + 3. / x_3])
-            
+
 
         x = np.array([[-1.0], [6.0], [3.0]])
         df_dx = np.array([[3.0, -1, -2], [0, .3333333333 - 0.5, -6 / 9.0 - 1 / 3.0]])
@@ -303,7 +303,7 @@ class TestSingleVariableAutoDiff(AutoDiffUnitTesting):
             for i in range(3):
                 retval[i] = 0
             return retval
-        
+
         x = np.array([[4.0], [3.0], [6.0], [7.0]])
         df_dx = np.array([[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0, 0], [0, 0, 0, 0], [0,0, 0, 1.0e-7]])
         self._test_helper(f, x, df_dx)
@@ -315,7 +315,7 @@ class TestSingleVariableAutoDiff(AutoDiffUnitTesting):
             for i in range(3):
                 retval[i] = u
             return retval
-        
+
         x = np.array([[4.0], [3.0], [6.0], [7.0]])
         df_dx = np.array([[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0, 0], [0, 0, 0, 0], [0,0, 0, 1.0e-7]])
         u = np.array([[1.0]])
@@ -392,20 +392,20 @@ class TestMultipleVariableAutoDiff(AutoDiffUnitTesting):
 
         with auto_diff.AutoDiff(affine_x, affine_u) as (x, u):
             y, (J_fx, J_fu) = auto_diff.get_value_and_jacobians(f(A_x @ x + b_x, A_u @ u + b_u))
-    
+
         self._assertAllClose(y, f_xu)
         self._assertAllClose(J_fx, df_dx)
         self._assertAllClose(J_fu, df_du)
 
         with auto_diff.AutoDiff(affine_x) as x:
             y, J_fx = auto_diff.get_value_and_jacobian(f(A_x @ x + b_x, A_u @ affine_u + b_u))
-    
+
         self._assertAllClose(y, f_xu)
         self._assertAllClose(J_fx, df_dx)
 
         with auto_diff.AutoDiff(affine_u) as u:
             y, J_fu = auto_diff.get_value_and_jacobian(f(A_x @ affine_x + b_x, A_u @ u + b_u))
-    
+
         self._assertAllClose(y, f_xu)
         self._assertAllClose(J_fu, df_du)
 
@@ -446,7 +446,7 @@ class TestMultipleVariableAutoDiff(AutoDiffUnitTesting):
                           [0., 1.],
                           [1., 0.],
                           [0., 1.]])
-        
+
         df_du = np.array([[1., 0., 0.],
                           [1., 0., 0.],
                           [0., 1., 0.],

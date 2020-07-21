@@ -3,21 +3,20 @@ import unittest
 import auto_diff
 import numpy as np
 
-class SparseAutoDiffUnitTesting(unittest.TestCase):
+class AutoDiffUnitTesting(unittest.TestCase):
     def _assertAllClose(self, actual, desired, rtol=1e-07, atol=1e-12, equal_nan=True):
-        if not isinstance(actual, np.ndarray):
-            actual = actual.toarray()
         np.testing.assert_allclose(actual, desired, rtol, atol, equal_nan)
 
 
-class TestSingleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
+class TestSingleVariableAutoDiff(AutoDiffUnitTesting):
     def _test_helper(self, f, x, df_dx, debug=False):
         if debug:
             breakpoint()
 
         input_x = x
+        input_df_dx = df_dx
         f_x = f(input_x)
-        with auto_diff.SparseAutoDiff(input_x) as x:
+        with auto_diff.AutoDiff(input_x) as x:
             y, Jf = auto_diff.get_value_and_jacobian(f(x))
 
         self._assertAllClose(y, f_x)
@@ -30,7 +29,7 @@ class TestSingleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
 
         df_dx = df_dx @ A
 
-        with auto_diff.SparseAutoDiff(x) as x:
+        with auto_diff.AutoDiff(x) as x:
             y, Jf = auto_diff.get_value_and_jacobian(f(A @ x + b))
 
         self._assertAllClose(y, f_x)
@@ -40,47 +39,44 @@ class TestSingleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
         if debug:
             breakpoint()
         input_x = x
+        input_df_dx = df_dx
         f_x = f(input_x)
 
-        with auto_diff.SparseAutoDiff(input_x) as x:
-            out_dest = np.empty(f_x.shape)
+        with auto_diff.AutoDiff(input_x, complex=True) as x:
+            out_dest = np.ndarray(f_x.shape)
             f(x, out=out_dest)
             y, Jf = auto_diff.get_value_and_jacobian(out_dest)
-            f(x, out=out_dest)
-            y2, Jf2 = auto_diff.get_value_and_jacobian(out_dest)
 
         self._assertAllClose(f_x, y)
         self._assertAllClose(Jf, df_dx)
-        self._assertAllClose(f_x, y2)
-        self._assertAllClose(Jf2, df_dx)
 
     def test_add_with_out(self):
         def f(x):
             y = np.sqrt(x)
-            out = np.empty((3, 1))
+            out = np.ndarray((3, 1), dtype=complex)
             np.add(x, y, out=out)
             return out
-        x = np.array([[2.], [4.], [9.0]])
-        df_dx = np.array([[1 + 0.5 / np.sqrt(2.), 0.0, 0.0],
-                            [0.0, 1 + 1./4., 0.0],
+        x = np.array([[2. + 1.j], [8j], [9.0]])
+        df_dx = np.array([[1 + 0.5 / np.sqrt(2. + 1.j), 0.0, 0.0],
+                            [0.0, 1 + 1./(4. + 4j), 0.0],
                             [0.0, 0.0, 1 + 1./6.]])
         self._test_helper(f, x, df_dx)
 
     def test_multiply_with_out(self):
         def f(x):
             y = np.sqrt(x)
-            out = np.empty((3, 1))
+            out = np.ndarray((3, 1), dtype=complex)
             np.multiply(x, y, out=out)
             return out
-        x = np.array([[2.], [4.], [9.0]])
-        df_dx = np.array([[np.sqrt(2) + 1 / np.sqrt(2.), 0.0, 0.0],
-                        [0.0, 2 + 4 * 1./4., 0.0],
+        x = np.array([[2. + 1.j], [8j], [9.0]])
+        df_dx = np.array([[np.sqrt(2 + 1.j) + (2 + 1j) / 2 / np.sqrt(2. + 1j), 0.0, 0.0],
+                        [0.0, (2 + 2j) + 8j * 1./(4. + 4j), 0.0],
                         [0.0, 0.0, 3 + 9 * 1./6.]])
         self._test_helper(f, x, df_dx)
 
     def test_abs(self):
         f = np.abs
-        x = np.array([[2.], [-2.], [0.0]])
+        x = np.array([[2. + 4j], [-2. + 3j], [0.0]])
         df_dx = np.array([[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, 0.0]])
         # x = np.array([[2.], [-2.], [4.0]])
         # df_dx = np.array([[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, 1.0]])
@@ -90,9 +86,9 @@ class TestSingleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
 
     def test_sqrt(self):
         f = np.sqrt
-        x = np.array([[2.], [4.], [9.0]])
-        df_dx = np.array([[0.5 / np.sqrt(2.), 0.0, 0.0],
-                        [0.0, 1./4., 0.0],
+        x = np.array([[2. + 1j], [8j], [9.0]])
+        df_dx = np.array([[0.5 / np.sqrt(2. + 1j), 0.0, 0.0],
+                        [0.0, 1./(4 + 4j), 0.0],
                         [0.0, 0.0, 1./6.]])
         # x = np.array([[2.], [-2.], [4.0]])
         # df_dx = np.array([[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, 1.0]])
@@ -101,69 +97,68 @@ class TestSingleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
 
     def test_sin(self):
         f = np.sin
-        x = np.array([[np.pi], [-np.pi/2], [np.pi/4]])
-        df_dx = np.array([[-1.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0, 0, np.sqrt(2) / 2]])
+        x = np.array([[np.log(2) * 1j], [(np.log(10) * 1j)], [np.pi/4]])
+        df_dx = np.array([[1.25, 0.0, 0.0], [0.0, 5.05, 0.0], [0, 0, np.sqrt(2) / 2]])
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
-
 
     def test_cos(self):
         f = np.cos
-        x = np.array([[np.pi], [-np.pi/2], [np.pi/4]])
-        df_dx = np.array([[0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0, 0, -np.sqrt(2) / 2]])
+        x = np.array([[np.log(2) * 1j], [(np.log(10) * 1j)], [np.pi/4]])
+        df_dx = np.array([[-0.75j, 0.0, 0.0], [0.0, -4.95j, 0.0], [0, 0, -np.sqrt(2) / 2]])
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
 
-    def test_tan(self):
+    def _test_tan(self):
         f = np.tan
         x = np.array([[np.pi], [-np.pi/3], [np.pi/4]])
         df_dx = np.array([[1.0, 0.0, 0.0], [0.0, 4.0, 0.0], [0, 0, 2.0]])
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
 
-    def test_tanh(self):
+    def _test_tanh(self):
         f = np.tanh
         x = np.array([[np.log(2)], [-np.log(3)], [0.0]])
         df_dx = np.array([[0.64, 0.0, 0.0], [0.0, 0.36, 0.0], [0, 0, 1.0]])
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
 
-    def test_sinh(self):
+    def _test_sinh(self):
         f = np.sinh
         x = np.array([[np.log(2)], [-np.log(3)], [0.0]])
         df_dx = np.array([[1.25, 0.0, 0.0], [0.0, 5 / 3, 0.0], [0, 0, 1.0]])
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
 
-    def test_cosh(self):
+    def _test_cosh(self):
         f = np.cosh
         x = np.array([[np.log(2)], [-np.log(3)], [0.0]])
         df_dx = np.array([[2.25/3, 0.0, 0.0], [0.0, -4/3, 0.0], [0, 0, 0.0]])
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
 
-    def test_arctanh(self):
+    def _test_arctanh(self):
         f = np.arctanh
         x = np.array([[np.sqrt(1/4)], [0.5], [0.0]])
         df_dx = np.array([[4/3, 0.0, 0.0], [0.0, 1/(1 - 0.5**2), 0.0], [0, 0, 1.0]])
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
 
-    def test_arccosh(self):
+    def _test_arccosh(self):
         f = np.arccosh
         x = np.array([[np.sqrt(5)], [np.sqrt(10)], [np.sqrt(17)]])
         df_dx = np.array([[1/2, 0.0, 0.0], [0.0, 1/3, 0.0], [0, 0, 1.0/4]])
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
 
-    def test_arcsinh(self):
+    def _test_arcsinh(self):
         f = np.arcsinh
         x = np.array([[np.sqrt(3)], [np.sqrt(8)], [np.sqrt(15)]])
         df_dx = np.array([[1/2, 0.0, 0.0], [0.0, 1/3, 0.0], [0, 0, 1.0/4]])
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
 
-    def test_arcsin(self):
+    def _test_arcsin(self):
         f = np.arcsin
         x = np.array([[0], [np.sqrt(2)/2], [1/2]])
         df_dx = np.array([[1.0, 0.0, 0.0],
@@ -172,7 +167,7 @@ class TestSingleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
 
-    def test_arccos(self):
+    def _test_arccos(self):
         f = np.arccos
         x = np.array([[0], [np.sqrt(2)/2], [1/2]])
         df_dx = np.array([[-1.0, 0.0, 0.0],
@@ -181,7 +176,7 @@ class TestSingleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
 
-    def test_arctan(self):
+    def _test_arctan(self):
         f = np.arctan
         x = np.array([[-1.0], [99999], [1.0]])
         df_dx = np.array([[0.5, 0.0, 0.0],
@@ -190,49 +185,49 @@ class TestSingleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
 
-    def test_log(self):
+    def _test_log(self):
         f = np.log
         x = np.array([[1.0], [0.5], [2.5]])
         df_dx = np.diag([1.0, 2, .4])
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
 
-    def test_log2(self):
+    def _test_log2(self):
         f = np.log2
         x = np.array([[1.0], [0.5], [2.5]])
         df_dx = np.diag([1.0, 2, .4]) / np.log(2)
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
 
-    def test_log10(self):
+    def _test_log10(self):
         f = np.log10
         x = np.array([[1.0], [0.5], [2.5]])
         df_dx = np.diag([1.0, 2, .4]) / np.log(10)
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
 
-    def test_log1p(self):
+    def _test_log1p(self):
         f = np.log1p
         x = np.array([[1.0], [-0.5], [1.5]])
         df_dx = np.diag([.5, 2, .4])
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
 
-    def test_negative(self):
+    def _test_negative(self):
         f = np.negative
         x = np.array([[1.0], [-0.5], [1.5]])
         df_dx = -np.eye(3)
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
 
-    def test_positive(self):
+    def _test_positive(self):
         f = np.positive
         x = np.array([[1.0], [-0.5], [1.5]])
         df_dx = np.eye(3)
         self._test_helper(f, x, df_dx)
         self._test_out(f, x, df_dx)
 
-    def test_decomposing_x(self):
+    def _test_decomposing_x(self):
         def f(x):
             x_1, x_2, x_3 = x
             return np.array([x_1 + x_2 + x_3])
@@ -252,7 +247,7 @@ class TestSingleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
         def f(x):
             x_1, x_2, x_3 = x
             return np.array([x_1 * x_2 - 2. * x_3 - x_1 * 3.,
-                            x_2 / x_3 - x_2 / 2. + 3. / x_3])
+                            x_2 / x_3 - x_2 / 1. + 3. / x_3])
 
 
         x = np.array([[-1.0], [6.0], [3.0]])
@@ -266,7 +261,7 @@ class TestSingleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
         x = np.array([[3.0], [3.0]])
         df_dx = np.array([[6.0, 0.0], [0.0, np.exp(3)], [27.0, 27.0 * np.log(3)]])
 
-    def test_constant(self):
+    def _test_constant(self):
         def f(x):
             return np.array([[0], [1], [2.0]])
 
@@ -274,18 +269,18 @@ class TestSingleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
         df_dx = np.array([[0], [0], [0.0]])
         self._test_helper(f, x, df_dx)
 
-    def test_matrixmul(self):
+    def _test_matrixmul(self):
         A = np.array([[1.0, 4.0, 7.0], [5.0, 7.0, -200]])
         x = np.array([[2.0], [3.0], [-4.0]])
         self._test_helper(lambda x: A @ x, x, A)
 
-    def test_affine(self):
+    def _test_affine(self):
         A = np.array([[1.0, 4.0, 7.0], [5.0, 7.0, -200]])
         b = np.array([[3.0], [-np.pi]])
         x = np.array([[2.0], [3.0], [-4.0]])
         self._test_helper(lambda x: A @ x + b, x, A)
 
-    def test_exp_of_affine(self):
+    def _test_exp_of_affine(self):
         A = np.array([[1.0, -2.0, 7.0], [5.0, 7.0, 1]])
         b = np.array([[48.0], [-8.0]])
         x = np.array([[2.0], [1.0], [-7.0]])
@@ -294,7 +289,7 @@ class TestSingleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
         df_dx = np.diag([y_1, y_2]) @ A
         self._test_helper(lambda x: np.exp(A @ x + b), x, df_dx)
 
-    def test_assign_scalar(self):
+    def _test_assign_scalar(self):
         def f(x):
             C = 1.0e-7;
             retval = C * x
@@ -306,7 +301,7 @@ class TestSingleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
         df_dx = np.array([[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0, 0], [0, 0, 0, 0], [0,0, 0, 1.0e-7]])
         self._test_helper(f, x, df_dx)
 
-    def test_assign_vector(self):
+    def _test_assign_vector(self):
         def f(x, u):
             C = 1.0e-7;
             retval = C * x
@@ -319,7 +314,7 @@ class TestSingleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
         u = np.array([[1.0]])
         self._test_helper(lambda x: f(x, u), x, df_dx)
 
-    def test_mutating_in_place(self):
+    def _test_mutating_in_place(self):
         def f(x):
             out = np.zeros((3, 1))
             out[1, 0] -= x[0, 0]
@@ -333,7 +328,7 @@ class TestSingleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
 
         self._test_helper(f, x, df_dx)
 
-    def test_mutating_in_place_same_row(self):
+    def _test_mutating_in_place_same_row(self):
         def f(x):
             out = np.zeros((1, 1))
             out[0, 0] += x[0, 0]
@@ -346,7 +341,9 @@ class TestSingleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
         self._test_helper(f, x, df_dx)
 
 
-class TestMultipleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
+
+
+class TestMultipleVariableAutoDiff(AutoDiffUnitTesting):
     def _test_helper(self, f, x, u, df_dx, df_du, debug=False):
         if debug:
             breakpoint()
@@ -356,20 +353,20 @@ class TestMultipleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
         input_x = x
         input_u = u
 
-        with auto_diff.SparseAutoDiff(x, u) as (x, u):
+        with auto_diff.AutoDiff(x, u) as (x, u):
             y, (J_fx, J_fu) = auto_diff.get_value_and_jacobians(f(x, u))
         self._assertAllClose(y, f_xu)
         self._assertAllClose(J_fx, df_dx)
         self._assertAllClose(J_fu, df_du)
 
         u = input_u
-        with auto_diff.SparseAutoDiff(input_x) as x:
+        with auto_diff.AutoDiff(input_x) as x:
             y, J_fx = auto_diff.get_value_and_jacobian(f(x, u))
         self._assertAllClose(y, f_xu)
         self._assertAllClose(J_fx, df_dx)
 
         x = input_x
-        with auto_diff.SparseAutoDiff(input_u) as u:
+        with auto_diff.AutoDiff(input_u) as u:
             y, J_fu = auto_diff.get_value_and_jacobian(f(x, u))
         self._assertAllClose(y, f_xu)
         self._assertAllClose(J_fu, df_du)
@@ -386,56 +383,56 @@ class TestMultipleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
         df_dx = df_dx @ A_x
         df_du = df_du @ A_u
 
-        with auto_diff.SparseAutoDiff(affine_x, affine_u) as (x, u):
+        with auto_diff.AutoDiff(affine_x, affine_u) as (x, u):
             y, (J_fx, J_fu) = auto_diff.get_value_and_jacobians(f(A_x @ x + b_x, A_u @ u + b_u))
 
         self._assertAllClose(y, f_xu)
         self._assertAllClose(J_fx, df_dx)
         self._assertAllClose(J_fu, df_du)
 
-        with auto_diff.SparseAutoDiff(affine_x) as x:
+        with auto_diff.AutoDiff(affine_x) as x:
             y, J_fx = auto_diff.get_value_and_jacobian(f(A_x @ x + b_x, A_u @ affine_u + b_u))
 
         self._assertAllClose(y, f_xu)
         self._assertAllClose(J_fx, df_dx)
 
-        with auto_diff.SparseAutoDiff(affine_u) as u:
+        with auto_diff.AutoDiff(affine_u) as u:
             y, J_fu = auto_diff.get_value_and_jacobian(f(A_x @ affine_x + b_x, A_u @ u + b_u))
 
         self._assertAllClose(y, f_xu)
         self._assertAllClose(J_fu, df_du)
 
     def test_linear(self):
-        A = np.array([[5, 6., 3., 1.],
-                      [2, 3.,  5,  4],
+        A = np.array([[5, 6., 3. + 3j, 1.],
+                      [2 + 2j, 3.,  5,  4 + 1j],
                       [np.pi, np.pi/2, np.e, np.exp(2)]])
 
-        B = np.array([[4, 2., 1.5],
-                      [.25, 2.5,  9],
-                      [np.e, 0.0, np.exp(0.5)]])
+        B = np.array([[4, 2., 1.5 + 3j],
+                      [.25, 2.5 + 3j,  9],
+                      [np.e + 3j, 0.0, np.exp(0.5)]])
 
-        x = np.array([[.6, .8, .3, .4]]).T
-        u = np.array([[.2, 8.3, .5]]).T
+        x = np.array([[.6, .8 + 3j, .3 +2j, .4 + 5j]]).T
+        u = np.array([[.2, 8.3, .5 + 1j]]).T
 
         self._test_helper(lambda x, u: A @ x + B @ u, x, u, A, B)
 
     def test_add_and_mulitply(self):
         def f(x, u):
-            A = np.array([[2., -1], [-1, 2]])
-            B = np.array([[1.] , [0]])
+            A = np.array([[2., -1], [-1 + 2j, 2]])
+            B = np.array([[1.] , [0 + 2j]])
             return A @ x + B * u
 
-        x = np.array([[5.], [3.]])
-        u = np.array([[3.]])
-        self._test_helper(f, x, u, np.array([[2, -1], [-1, 2.]]), np.array([[1], [0.]]))
+        x = np.array([[5. + 1j], [3.]])
+        u = np.array([[3. +5j]])
+        self._test_helper(f, x, u, np.array([[2, -1], [-1 + 2j, 2.]]), np.array([[1], [0. + 2j]]))
 
     def test_addition_broadcasting_and_reshape(self):
         def f(x, u):
             y = x.T + u
             return y.reshape((6, 1))
 
-        x = np.array([[5.], [2.]])
-        u = np.array([[3.], [7.], [11.]])
+        x = np.array([[5. + 3j], [2.]])
+        u = np.array([[3.], [7. + 2j], [11.]])
         df_dx = np.array([[1., 0.],
                           [0., 1.],
                           [1., 0.],
@@ -456,8 +453,8 @@ class TestMultipleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
             y = np.subtract(x.T, u)
             return y.reshape((6, 1))
 
-        x = np.array([[5.], [2.]])
-        u = np.array([[3.], [7.], [11.]])
+        x = np.array([[5.], [2.j]])
+        u = np.array([[3.j], [7.], [11. + 3j]])
         df_dx = np.array([[1., 0.],
                           [0., 1.],
                           [1., 0.],
@@ -473,7 +470,7 @@ class TestMultipleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
 
         self._test_helper(f, x, u, df_dx, df_du)
 
-    def test_division_broadcasting_and_reshape(self):
+    def _test_division_broadcasting_and_reshape(self):
         def f(x, u):
             y = np.divide(x.T, u)
             return y.reshape((4, 1))
@@ -492,7 +489,7 @@ class TestMultipleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
         self._test_helper(f, x, u, df_dx, df_du)
 
 
-    def test_float_power_broadcasting_and_reshape(self):
+    def _test_float_power_broadcasting_and_reshape(self):
         def f(x, u):
             y = np.float_power(x.T, u)
             return y.reshape((4, 1))
@@ -510,7 +507,7 @@ class TestMultipleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
 
         self._test_helper(f, x, u, df_dx, df_du)
 
-    def test_power_broadcasting_and_reshape(self):
+    def _test_power_broadcasting_and_reshape(self):
         def f(x, u):
             y = np.power(x.T, u)
             return y.reshape((4, 1))
@@ -528,15 +525,14 @@ class TestMultipleVariableSparseAutoDiff(SparseAutoDiffUnitTesting):
 
         self._test_helper(f, x, u, df_dx, df_du)
 
-
-class TestArbitraryShapeSparseAutoDiff(SparseAutoDiffUnitTesting):
+class TestArbitraryShapeAutoDiff(AutoDiffUnitTesting):
     def _test_helper(self, f, x, df_dx, debug=False):
         if debug:
             breakpoint()
 
         input_x = x
         f_x = f(input_x)
-        with auto_diff.SparseAutoDiff(input_x) as x:
+        with auto_diff.AutoDiff(input_x) as x:
             ad_f_x = f(x)
             y, Jf = ad_f_x.val, ad_f_x.der
 
