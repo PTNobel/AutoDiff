@@ -282,7 +282,7 @@ def add(x1, x2, /, out):
     if out.val is None:
         out = modded_np.empty(broadcast_obj.shape)
     idx_iterator = _ndindex(out.val.shape)
- 
+
     if isinstance(x1, cls) and isinstance(x2, cls):
         for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
             out.val[idx] = x1_elem.val + x2_elem.val
@@ -311,7 +311,7 @@ def subtract(x1, x2, /, out):
     if out.val is None:
         out = modded_np.empty(broadcast_obj.shape)
     idx_iterator = _ndindex(out.val.shape)
- 
+
     if isinstance(x1, cls) and isinstance(x2, cls):
         for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
             out.val[idx] = x1_elem.val - x2_elem.val
@@ -341,7 +341,7 @@ def multiply(x1, x2, /, out):
     if out.val is None:
         out = modded_np.empty(broadcast_obj.shape)
     idx_iterator = _ndindex(out.val.shape)
- 
+
     if isinstance(x1, cls) and isinstance(x2, cls):
         for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
             out.val[idx] = x1_elem.val * x2_elem.val
@@ -372,7 +372,7 @@ def true_divide(x1, x2, /, out):
     if out.val is None:
         out = modded_np.empty(broadcast_obj.shape)
     idx_iterator = _ndindex(out.val.shape)
- 
+
     if isinstance(x1, cls) and isinstance(x2, cls):
         for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
             out.val[idx] = x1_elem.val / x2_elem.val
@@ -403,7 +403,7 @@ def float_power(x1, x2, /, out):
     if out.val is None:
         out = modded_np.empty(broadcast_obj.shape)
     idx_iterator = _ndindex(out.val.shape)
- 
+
     if isinstance(x1, cls) and isinstance(x2, cls):
         for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
             out.val[idx] = np.float_power(x1_elem.val, x2_elem.val)
@@ -433,7 +433,7 @@ def power(x1, x2, /, out):
     if out.val is None:
         out = modded_np.empty(broadcast_obj.shape)
     idx_iterator = _ndindex(out.val.shape)
- 
+
     if isinstance(x1, cls) and isinstance(x2, cls):
         for idx, (x1_elem, x2_elem) in zip(idx_iterator, broadcast_obj):
             out.val[idx] = np.power(x1_elem.val, x2_elem.val)

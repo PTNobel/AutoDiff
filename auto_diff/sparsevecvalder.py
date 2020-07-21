@@ -41,7 +41,7 @@ class SparseVecValDer(np.lib.mixins.NDArrayOperatorsMixin):
     argpartition = _defer_to_val('argpartition')
     argsort = _defer_to_val('argsort')
     nonzero = _defer_to_val('nonzero')
-    
+
     def copy(self):
         return SparseVecValDer(self.val.copy(), self.der.copy())
 

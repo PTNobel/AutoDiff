@@ -115,7 +115,7 @@ class AutoDiff:
         val = true_np.zeros(shape, dtype=_der_dtype)
         return self._build_vec_val_der(val)
 
-    def ndarray(self, shape):
+    def ndarray(self, shape, dtype=None):
         val = true_np.ndarray(shape, dtype=_der_dtype)
         return self._build_vec_val_der(val)
 

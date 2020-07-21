@@ -133,7 +133,7 @@ def get_value_and_jacobians(x):
     import numpy as np
     if isinstance(x, true_np.ndarray):
         x = np.array(x)
-    
+
     jacobians = []
     total = 0
 

@@ -313,7 +313,7 @@ def transpose(a, axes=None):
     val_idx = np.arange(np.size(a.val)).reshape(a.val.shape)
 
     val_idx_shuffle = np.transpose(val_idx, axes)
-    
+
     der = a.der[val_idx_shuffle.flat]
     return cls(val, der)
 
@@ -565,7 +565,7 @@ def _matmul_internal_gradient_compute_valder_valder(i, k, x1, x2, grad_matrix, e
     for j in range(x1.shape[1]):
         x2_der_idx = _square_index_to_simple_index((j, k), x2.val.shape)
         x1_der_idx = _square_index_to_simple_index((i, j), x1.val.shape)
-        x1_ij = x1.val[i, j] 
+        x1_ij = x1.val[i, j]
         x2_jk = x2.val[j, k]
         for grad_idx, x2_der_value in zip(x2.der.rows[x2_der_idx], x2.der.data[x2_der_idx]):
             grad_matrix[entry_index, grad_idx] += x1_ij * x2_der_value
@@ -594,7 +594,7 @@ def _matmul_internal_gradient_compute_ndarray_valder(i, k, x1, x2, grad_matrix, 
     """
     for j in range(x1.shape[1]):
         x2_der_idx = _square_index_to_simple_index((j, k), x2.val.shape)
-        x1_ij = x1[i, j] 
+        x1_ij = x1[i, j]
 
         for grad_idx, x2_der_value in zip(x2.der.rows[x2_der_idx], x2.der.data[x2_der_idx]):
             grad_matrix[entry_index, grad_idx] += x1_ij * x2_der_value
