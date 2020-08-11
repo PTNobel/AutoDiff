@@ -111,7 +111,7 @@ class AutoDiff:
         der = true_np.zeros((*val.shape, *self.x.shape), dtype=_der_dtype)
         return VecValDer(val, der)
 
-    def zeros(self, shape):
+    def zeros(self, shape, dtype=None):
         val = true_np.zeros(shape, dtype=_der_dtype)
         return self._build_vec_val_der(val)
 
@@ -141,15 +141,15 @@ class AutoDiff:
 
         return val_rows, der_rows
 
-    def array(self, obj):
+    def array(self, obj, dtype=None):
         if isinstance(obj, VecValDer):
             return VecValDer(obj.val, obj.der)
         elif hasattr(obj, '__array_interface__') \
                 or hasattr(obj, '__array__'):
-            val = true_np.array(obj)
+            val = true_np.array(obj, dtype=dtype)
             return self._build_vec_val_der(val)
         elif np.isscalar(obj):
-            val = true_np.array(obj)
+            val = true_np.array(obj, dtype=dtype)
             return self._build_vec_val_der(val)
         else:
             val_rows, der_rows = self._parse_list_of_items(obj)
@@ -197,7 +197,7 @@ class AutoDiff:
         val = true_np.full(shape, fill_value, dtype=_der_dtype)
         return self._build_vec_val_der(val)
 
-    def empty(self, shape):
+    def empty(self, shape, dtype=None):
         val = true_np.empty(shape, dtype=_der_dtype)
         return self._build_vec_val_der(val)
 
