@@ -183,10 +183,18 @@ def jacobian(x):
     return x.der.reshape((i, k))
 
 
+def generate_jacobian_function(f, n=0):
+    def retval(*args, **kwargs):
+        args_before, arg, args_after = args[:n], args[n], args[n+1:]
+        with AutoDiff(arg) as ad_arg:
+            return jacobian(f(*args_before, ad_arg, *args_after, **kwargs))
+    return retval
+
 __all__ = [
     'AutoDiff',
     'SparseAutoDiff',
     'get_value_and_jacobian',
     'get_value_and_jacobians',
     'jacobian',
+    'generate_jacobian_function',
 ]
