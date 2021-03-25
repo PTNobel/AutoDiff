@@ -92,6 +92,10 @@ Email `parthnobel@berkeley.edu`
 There are missing features right now. I'm working on them, feel free to email me
 if you want something prioritized.
 
+## How It Works
+
+Parth Nobel. 2020. Auto_diff: an automatic differentiation package for Python. In Proceedings of the 2020 Spring Simulation Conference (SpringSim '20). Society for Computer Simulation International, San Diego, CA, USA, Article 10, 1–12. https://dl.acm.org/doi/10.5555/3408207.3408219
+
 ## Prerequisite
 A version of NumPy >= 1.17 may be required. Bugs on older versions have always
 raised errors, so there should be nothing to worry about.
