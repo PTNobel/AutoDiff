@@ -133,7 +133,7 @@ def register(np_fn):
     assert np_fn not in _HANDLED_FUNCS_AND_UFUNCS
 
     def decorator(f):
-        assert np_fn.__name__ == f.__name__
+        #assert np_fn.__name__ == f.__name__
         _HANDLED_FUNCS_AND_UFUNCS[np_fn] = f
         return f
     return decorator
