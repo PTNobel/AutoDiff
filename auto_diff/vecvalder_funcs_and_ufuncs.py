@@ -11,7 +11,8 @@ cls = VecValDer
 def _ndindex(shape):
     state = [0 for _ in shape]
     total = 0
-    stop_condition = np.product(shape)
+    # stop_condition = np.product(shape) # JR 2025/02/26: numpy.product no longer exists.
+    stop_condition = np.prod(shape) # JR: 2025/02/26: use numpy.prod
     while total < stop_condition:
         total += 1
         yield tuple(state)
